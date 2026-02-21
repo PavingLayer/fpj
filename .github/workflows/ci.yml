@@ -1,0 +1,66 @@
+name: fpj CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux (full)
+          - os: macos-15
+            name: macOS
+          - os: windows-latest
+            name: Windows
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install FUSE dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fuse-overlayfs fuse3
+          sudo modprobe fuse
+
+      - name: Install macFUSE and bindfs
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          brew install --cask macfuse || true
+          brew install bindfs || true
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
+        run: sudo cargo test --release
+
+      - name: Run tests (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: cargo test --release

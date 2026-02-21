@@ -1,0 +1,14 @@
+[book]
+title = "fpj — File Projector"
+description = "Application-agnostic tool for creating and managing flexible filesystem views"
+authors = ["vi"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/PavingLayer/fpj"
