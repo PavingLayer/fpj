@@ -1,25 +1,30 @@
 use std::path::PathBuf;
 
 use clap::Subcommand;
+use clap_complete::engine::ArgValueCompleter;
 
 use fpj::engine::LayoutEngine;
 use fpj::error::{LayerfsError, Result};
 use fpj::model::MountStepDef;
+
+use super::complete;
 
 #[derive(Subcommand)]
 pub enum StepCommand {
     /// Add a layer mount step
     AddLayer {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: String,
 
         /// Layer name to mount
-        #[arg(long)]
+        #[arg(long, add = ArgValueCompleter::new(complete::complete_layer_names))]
         layer: String,
     },
     /// Add a bind mount step
     AddBind {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: String,
 
         /// Absolute path to source directory
@@ -33,6 +38,7 @@ pub enum StepCommand {
     /// Remove a step by position
     Remove {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: String,
 
         /// Step position (0-based)
@@ -42,6 +48,7 @@ pub enum StepCommand {
     /// List steps in a layout
     List {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: String,
     },
 }

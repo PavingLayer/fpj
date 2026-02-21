@@ -1,10 +1,13 @@
 use std::path::PathBuf;
 
 use clap::Subcommand;
+use clap_complete::engine::ArgValueCompleter;
 
 use fpj::engine::LayoutEngine;
 use fpj::error::{LayerfsError, Result};
 use fpj::model::LayerSource;
+
+use super::complete;
 
 #[derive(Subcommand)]
 pub enum LayerCommand {
@@ -14,7 +17,7 @@ pub enum LayerCommand {
         name: String,
 
         /// Source: absolute path for a directory, or @layer-name for a layer reference
-        #[arg(long)]
+        #[arg(long, add = ArgValueCompleter::new(complete::complete_layer_source))]
         source: String,
 
         /// Absolute path to the mount point
@@ -24,6 +27,7 @@ pub enum LayerCommand {
     /// Remove a layer
     Remove {
         /// Layer name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layer_names))]
         name: String,
     },
     /// List all layers
@@ -31,16 +35,19 @@ pub enum LayerCommand {
     /// Show layer details
     Show {
         /// Layer name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layer_names))]
         name: String,
     },
     /// Lock a layer (writable -> locked)
     Lock {
         /// Layer name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layer_names))]
         name: String,
     },
     /// Unlock a layer (locked -> writable)
     Unlock {
         /// Layer name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layer_names))]
         name: String,
     },
 }

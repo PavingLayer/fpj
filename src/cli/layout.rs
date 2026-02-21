@@ -1,7 +1,10 @@
 use clap::Subcommand;
+use clap_complete::engine::ArgValueCompleter;
 
 use fpj::engine::LayoutEngine;
 use fpj::error::Result;
+
+use super::complete;
 
 #[derive(Subcommand)]
 pub enum LayoutCommand {
@@ -13,6 +16,7 @@ pub enum LayoutCommand {
     /// Remove a layout and its step definitions
     Remove {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         name: String,
     },
     /// List all layouts
@@ -20,6 +24,7 @@ pub enum LayoutCommand {
     /// Show layout details
     Show {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         name: String,
     },
 }

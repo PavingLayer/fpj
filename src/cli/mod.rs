@@ -1,3 +1,4 @@
+mod complete;
 mod layer;
 mod layout;
 mod mount;
@@ -5,7 +6,9 @@ mod step;
 
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::engine::ArgValueCompleter;
+use clap_complete::env::CompleteEnv;
 
 use fpj::backend::create_backend;
 use fpj::database::LayoutDatabase;
@@ -43,21 +46,25 @@ enum Commands {
     /// Mount all steps of a layout atomically
     Mount {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: String,
     },
     /// Unmount all steps of a layout in reverse order
     Unmount {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: String,
     },
     /// Restore layouts from persisted definitions
     Restore {
         /// Layout name (omit for all layouts)
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: Option<String>,
     },
     /// Show mount status
     Status {
         /// Layout name
+        #[arg(add = ArgValueCompleter::new(complete::complete_layout_names))]
         layout: String,
         /// Output as JSON
         #[arg(long)]
@@ -66,6 +73,8 @@ enum Commands {
 }
 
 pub fn run() -> Result<()> {
+    CompleteEnv::with_factory(Cli::command).complete();
+
     let cli = Cli::parse();
     let db_path = cli.db.unwrap_or_else(default_db_path);
     let db = LayoutDatabase::open(&db_path)?;
