@@ -20,6 +20,9 @@ pub enum LayerfsError {
     #[error("circular layer reference detected: {0}")]
     CircularReference(String),
 
+    #[error("layer '{name}' is referenced by child layer(s): {children}")]
+    LayerHasChildren { name: String, children: String },
+
     #[error("step at position {0} not found in layout '{1}'")]
     StepNotFound(usize, String),
 

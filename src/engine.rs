@@ -55,7 +55,33 @@ impl LayoutEngine {
     }
 
     pub fn remove_layer(&self, name: &str) -> Result<()> {
-        self.db.remove_layer(name)
+        let children = self.db.layer_children(name)?;
+        if !children.is_empty() {
+            return Err(LayerfsError::LayerHasChildren {
+                name: name.to_string(),
+                children: children.join(", "),
+            });
+        }
+
+        // Load layer to get paths before removing DB record
+        let layer = self.db.load_layer(name)?;
+        self.db.remove_layer(name)?;
+
+        // Clean up on-disk data directory
+        let data_dir = layers_data_dir().join(name);
+        if data_dir.exists() {
+            std::fs::remove_dir_all(&data_dir).map_err(|e| {
+                LayerfsError::Other(format!(
+                    "removed layer '{}' from database but failed to clean up {}: {}",
+                    name,
+                    data_dir.display(),
+                    e
+                ))
+            })?;
+        }
+        let _ = layer; // used above to verify existence
+
+        Ok(())
     }
 
     pub fn get_layer(&self, name: &str) -> Result<Layer> {

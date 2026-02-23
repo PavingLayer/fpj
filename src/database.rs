@@ -249,6 +249,17 @@ impl LayoutDatabase {
         Ok(names)
     }
 
+    /// Return names of layers that reference `name` as their source.
+    pub fn layer_children(&self, name: &str) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT name FROM layers WHERE source_type = 'layer' AND source_value = ?1 ORDER BY name",
+        )?;
+        let names: Vec<String> = stmt
+            .query_map([name], |row| row.get(0))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(names)
+    }
+
     pub fn layer_exists(&self, name: &str) -> Result<bool> {
         let exists: bool = self.conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM layers WHERE name = ?1)",
