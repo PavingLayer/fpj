@@ -37,6 +37,10 @@ pub enum LayerCommand {
         /// Layer name
         #[arg(add = ArgValueCompleter::new(complete::complete_layer_names))]
         name: String,
+
+        /// Show the resolved lower-dir chain (flattened ancestry)
+        #[arg(long)]
+        resolve: bool,
     },
     /// Lock a layer (writable -> locked)
     Lock {
@@ -96,7 +100,7 @@ pub fn handle(cmd: LayerCommand, engine: &LayoutEngine) -> Result<()> {
                 }
             }
         }
-        LayerCommand::Show { name } => {
+        LayerCommand::Show { name, resolve } => {
             let layer = engine.get_layer(&name)?;
             println!("Layer: {}", layer.name);
             println!("  Source:      {}", layer.source);
@@ -104,6 +108,13 @@ pub fn handle(cmd: LayerCommand, engine: &LayoutEngine) -> Result<()> {
             println!("  Role:        {}", layer.role);
             println!("  Upper dir:   {}", layer.upper_dir.display());
             println!("  Work dir:    {}", layer.work_dir.display());
+            if resolve {
+                let lower_dirs = engine.resolve_lower_dirs(&name)?;
+                println!("  Resolved lower dirs:");
+                for (i, dir) in lower_dirs.iter().enumerate() {
+                    println!("    [{i}] {}", dir.display());
+                }
+            }
         }
         LayerCommand::Lock { name } => {
             engine.lock_layer(&name)?;
