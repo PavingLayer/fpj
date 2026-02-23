@@ -2,8 +2,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use nix::mount::{mount, umount, MsFlags};
-
 use crate::backend::MountBackend;
 use crate::error::{LayerfsError, Result};
 
@@ -12,6 +10,24 @@ pub struct LinuxBackend;
 impl LinuxBackend {
     pub fn new() -> Self {
         Self
+    }
+
+    fn run_fuse_tool(name: &str, args: &[&std::ffi::OsStr]) -> std::result::Result<(), LayerfsError> {
+        let output = Command::new(name)
+            .args(args)
+            .output()
+            .map_err(|e| {
+                LayerfsError::Backend(format!(
+                    "{name} not available (install it with your package manager): {e}"
+                ))
+            })?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(LayerfsError::Backend(format!("{name} failed: {stderr}")));
+        }
+
+        Ok(())
     }
 }
 
@@ -34,114 +50,36 @@ impl MountBackend for LinuxBackend {
             .join(":");
 
         let opts = format!(
-            "lowerdir={},upperdir={},workdir={}",
+            "allow_other,lowerdir={},upperdir={},workdir={}",
             lowerdir,
             upper_dir.display(),
             work_dir.display()
         );
 
-        // Try fuse-overlayfs first (unprivileged)
-        let output = Command::new("fuse-overlayfs")
-            .arg("-o")
-            .arg(format!("allow_other,{opts}"))
-            .arg(mount_point.as_os_str())
-            .output();
-
-        match output {
-            Ok(o) if o.status.success() => return Ok(()),
-            Ok(o) => {
-                let stderr = String::from_utf8_lossy(&o.stderr);
-                // Fall through to kernel overlay if fuse-overlayfs not available
-                if stderr.contains("not found") || stderr.contains("No such file") {
-                    // fuse-overlayfs not installed, try kernel overlay
-                } else {
-                    return Err(LayerfsError::Backend(format!(
-                        "fuse-overlayfs failed: {stderr}"
-                    )));
-                }
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // fuse-overlayfs binary not found, try kernel overlay
-            }
-            Err(e) => return Err(e.into()),
-        }
-
-        // Fallback: kernel overlayfs (needs CAP_SYS_ADMIN)
-        mount(
-            Some("overlay"),
-            mount_point,
-            Some("overlay"),
-            MsFlags::empty(),
-            Some(opts.as_str()),
-        )
-        .map_err(|e| LayerfsError::Backend(format!("kernel overlay mount failed: {e}")))?;
-
-        Ok(())
+        Self::run_fuse_tool("fuse-overlayfs", &[
+            std::ffi::OsStr::new("-o"),
+            std::ffi::OsStr::new(&opts),
+            mount_point.as_os_str(),
+        ])
     }
 
     fn unmount_overlay(&self, mount_point: &Path) -> Result<()> {
-        // Try fusermount first (for FUSE mounts)
-        let output = Command::new("fusermount")
-            .arg("-u")
-            .arg(mount_point.as_os_str())
-            .output();
-
-        match output {
-            Ok(o) if o.status.success() => return Ok(()),
-            _ => {}
-        }
-
-        // Fallback: regular umount
-        umount(mount_point).map_err(|e| LayerfsError::UnmountFailed {
+        Self::run_fuse_tool("fusermount", &[
+            std::ffi::OsStr::new("-u"),
+            mount_point.as_os_str(),
+        ]).map_err(|e| LayerfsError::UnmountFailed {
             path: mount_point.to_path_buf(),
             reason: e.to_string(),
-        })?;
-
-        Ok(())
+        })
     }
 
     fn bind_mount(&self, source: &Path, target: &Path) -> Result<()> {
         self.ensure_writable_in_overlay(target)?;
 
-        // Try bindfs first (unprivileged FUSE-based bind mount)
-        let output = Command::new("bindfs")
-            .arg(source.as_os_str())
-            .arg(target.as_os_str())
-            .output();
-
-        match output {
-            Ok(o) if o.status.success() => return Ok(()),
-            Ok(o) => {
-                let stderr = String::from_utf8_lossy(&o.stderr);
-                if !stderr.contains("not found") && !stderr.contains("No such file") {
-                    return Err(LayerfsError::Backend(format!(
-                        "bindfs {} -> {} failed: {stderr}",
-                        source.display(),
-                        target.display()
-                    )));
-                }
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e.into()),
-        }
-
-        // Fallback: kernel bind mount (needs CAP_SYS_ADMIN)
-        mount(
-            Some(source),
-            target,
-            None::<&str>,
-            MsFlags::MS_BIND,
-            None::<&str>,
-        )
-        .map_err(|e| {
-            LayerfsError::Backend(format!(
-                "bind mount {} -> {} failed: {e}",
-                source.display(),
-                target.display()
-            ))
-        })?;
-
-        Ok(())
+        Self::run_fuse_tool("bindfs", &[
+            source.as_os_str(),
+            target.as_os_str(),
+        ])
     }
 
     fn unbind_mount(&self, target: &Path) -> Result<()> {
@@ -149,23 +87,13 @@ impl MountBackend for LinuxBackend {
             return Ok(());
         }
 
-        // Try fusermount first (for FUSE/bindfs mounts)
-        let output = Command::new("fusermount")
-            .arg("-u")
-            .arg(target.as_os_str())
-            .output();
-
-        match output {
-            Ok(o) if o.status.success() => return Ok(()),
-            _ => {}
-        }
-
-        umount(target).map_err(|e| LayerfsError::UnmountFailed {
+        Self::run_fuse_tool("fusermount", &[
+            std::ffi::OsStr::new("-u"),
+            target.as_os_str(),
+        ]).map_err(|e| LayerfsError::UnmountFailed {
             path: target.to_path_buf(),
             reason: e.to_string(),
-        })?;
-
-        Ok(())
+        })
     }
 
     fn is_mounted(&self, path: &Path) -> Result<bool> {
