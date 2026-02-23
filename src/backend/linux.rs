@@ -103,6 +103,29 @@ impl MountBackend for LinuxBackend {
     fn bind_mount(&self, source: &Path, target: &Path) -> Result<()> {
         self.ensure_writable_in_overlay(target)?;
 
+        // Try bindfs first (unprivileged FUSE-based bind mount)
+        let output = Command::new("bindfs")
+            .arg(source.as_os_str())
+            .arg(target.as_os_str())
+            .output();
+
+        match output {
+            Ok(o) if o.status.success() => return Ok(()),
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                if !stderr.contains("not found") && !stderr.contains("No such file") {
+                    return Err(LayerfsError::Backend(format!(
+                        "bindfs {} -> {} failed: {stderr}",
+                        source.display(),
+                        target.display()
+                    )));
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
+        }
+
+        // Fallback: kernel bind mount (needs CAP_SYS_ADMIN)
         mount(
             Some(source),
             target,
@@ -124,6 +147,17 @@ impl MountBackend for LinuxBackend {
     fn unbind_mount(&self, target: &Path) -> Result<()> {
         if !self.is_mounted(target)? {
             return Ok(());
+        }
+
+        // Try fusermount first (for FUSE/bindfs mounts)
+        let output = Command::new("fusermount")
+            .arg("-u")
+            .arg(target.as_os_str())
+            .output();
+
+        match output {
+            Ok(o) if o.status.success() => return Ok(()),
+            _ => {}
         }
 
         umount(target).map_err(|e| LayerfsError::UnmountFailed {
