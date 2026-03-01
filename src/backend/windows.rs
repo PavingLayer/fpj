@@ -63,9 +63,7 @@ impl MountBackend for WindowsBackend {
             .arg(target.as_os_str())
             .arg(source.as_os_str())
             .output()
-            .map_err(|e| {
-                LayerfsError::Backend(format!("mklink /J failed: {e}"))
-            })?;
+            .map_err(|e| LayerfsError::Backend(format!("mklink /J failed: {e}")))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

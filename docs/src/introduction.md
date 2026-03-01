@@ -1,11 +1,11 @@
 # fpj
 
-**fpj** is an application-agnostic tool for creating and managing layered filesystem views using overlay mounts and bind mounts. It provides:
+**fpj** is a tool for creating and managing layered filesystem views using overlay mounts and bind mounts. It provides:
 
 - **Named layers** -- first-class entities with internal storage management; you provide only a source directory (or a reference to another layer) and a mount point
-- **Layouts** -- persistent recipes that assemble layers and bind mounts into a complete filesystem view, with atomic mount/unmount and rollback on failure
+- **Layouts** -- persistent recipes that assemble layers and bind mounts into a complete filesystem view, with atomic mount/unmount and (rolls back on failure)
 - **Flat chain resolution** -- layers can reference other locked layers as their base, and fpj automatically flattens the entire chain into a single efficient overlay mount
-- **Cross-platform** -- a single Rust binary with platform-specific backends for Linux, macOS, and Windows
+- **Cross-platform** -- a single binary with platform-specific backends for Linux, macOS, and Windows
 - **Persistence** -- layer and layout definitions survive reboots in a SQLite database; a single `restore` command remounts everything
 
 ## When to use fpj
@@ -16,7 +16,6 @@ fpj is useful whenever you need to:
 - Create writable workspaces on top of read-only base images
 - Fork an existing layered environment by locking a layer and building a new layer on top
 - Overlay configuration directories onto assembled filesystem views
-- Manage all of the above through a CLI or programmatically via subprocess calls
 
 ## Quick example
 

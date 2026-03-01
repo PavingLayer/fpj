@@ -16,7 +16,10 @@ use fpj::engine::{default_db_path, LayoutEngine};
 use fpj::error::Result;
 
 #[derive(Parser)]
-#[command(name = "fpj", about = "File Projector — flexible filesystem view manager")]
+#[command(
+    name = "fpj",
+    about = "File Projector — flexible filesystem view manager"
+)]
 struct Cli {
     /// Path to database file (default: ~/.local/share/fpj/fpj.db)
     #[arg(long, global = true)]

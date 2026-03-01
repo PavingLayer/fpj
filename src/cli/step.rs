@@ -71,10 +71,7 @@ pub fn handle(cmd: StepCommand, engine: &LayoutEngine) -> Result<()> {
                 return Err(LayerfsError::RelativePath(target));
             }
 
-            engine.add_step(
-                &layout,
-                MountStepDef::Bind { source, target },
-            )?;
+            engine.add_step(&layout, MountStepDef::Bind { source, target })?;
             println!("Added bind step to layout '{layout}'");
         }
         StepCommand::Remove { layout, position } => {

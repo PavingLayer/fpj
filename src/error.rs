@@ -30,10 +30,7 @@ pub enum LayerfsError {
     NotALayer { position: usize, layout: String },
 
     #[error("layer '{name}' cannot transition: current role is {current_role}")]
-    InvalidRoleTransition {
-        name: String,
-        current_role: String,
-    },
+    InvalidRoleTransition { name: String, current_role: String },
 
     #[error("mount failed at step {position}: {reason}")]
     MountFailed { position: usize, reason: String },

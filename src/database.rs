@@ -57,10 +57,9 @@ impl LayoutDatabase {
     // --- Layout CRUD ---
 
     pub fn create_layout(&self, name: &str) -> Result<()> {
-        let changed = self.conn.execute(
-            "INSERT OR IGNORE INTO layouts (name) VALUES (?1)",
-            [name],
-        )?;
+        let changed = self
+            .conn
+            .execute("INSERT OR IGNORE INTO layouts (name) VALUES (?1)", [name])?;
         if changed == 0 {
             return Err(LayerfsError::LayoutAlreadyExists(name.to_string()));
         }
@@ -70,7 +69,8 @@ impl LayoutDatabase {
     pub fn remove_layout(&self, name: &str) -> Result<()> {
         self.conn
             .execute("DELETE FROM mount_steps WHERE layout_name = ?1", [name])?;
-        let changed = self.conn
+        let changed = self
+            .conn
             .execute("DELETE FROM layouts WHERE name = ?1", [name])?;
         if changed == 0 {
             return Err(LayerfsError::LayoutNotFound(name.to_string()));
@@ -107,7 +107,12 @@ impl LayoutDatabase {
 
         for (i, step) in layout.steps.iter().enumerate() {
             let (step_type, step_json) = serialize_step(step)?;
-            stmt.execute(rusqlite::params![&layout.name, i as i64, step_type, step_json])?;
+            stmt.execute(rusqlite::params![
+                &layout.name,
+                i as i64,
+                step_type,
+                step_json
+            ])?;
         }
 
         drop(stmt);
@@ -178,7 +183,8 @@ impl LayoutDatabase {
     }
 
     pub fn remove_layer(&self, name: &str) -> Result<()> {
-        let changed = self.conn
+        let changed = self
+            .conn
             .execute("DELETE FROM layers WHERE name = ?1", [name])?;
         if changed == 0 {
             return Err(LayerfsError::LayerNotFound(name.to_string()));
@@ -199,24 +205,33 @@ impl LayoutDatabase {
             let upper_dir: String = row.get(4)?;
             let work_dir: String = row.get(5)?;
 
-            Ok((source_type, source_value, mount_point, role_str, upper_dir, work_dir))
+            Ok((
+                source_type,
+                source_value,
+                mount_point,
+                role_str,
+                upper_dir,
+                work_dir,
+            ))
         })
         .map_err(|_| LayerfsError::LayerNotFound(name.to_string()))
-        .and_then(|(source_type, source_value, mount_point, role_str, upper_dir, work_dir)| {
-            let source = deserialize_source(&source_type, &source_value);
-            let role = match role_str.as_str() {
-                "locked" => LayerRole::Locked,
-                _ => LayerRole::Writable,
-            };
-            Ok(Layer {
-                name: name.to_string(),
-                source,
-                mount_point: PathBuf::from(mount_point),
-                role,
-                upper_dir: PathBuf::from(upper_dir),
-                work_dir: PathBuf::from(work_dir),
-            })
-        })
+        .map(
+            |(source_type, source_value, mount_point, role_str, upper_dir, work_dir)| {
+                let source = deserialize_source(&source_type, &source_value);
+                let role = match role_str.as_str() {
+                    "locked" => LayerRole::Locked,
+                    _ => LayerRole::Writable,
+                };
+                Layer {
+                    name: name.to_string(),
+                    source,
+                    mount_point: PathBuf::from(mount_point),
+                    role,
+                    upper_dir: PathBuf::from(upper_dir),
+                    work_dir: PathBuf::from(work_dir),
+                }
+            },
+        )
     }
 
     pub fn save_layer(&self, layer: &Layer) -> Result<()> {
@@ -240,9 +255,7 @@ impl LayoutDatabase {
     }
 
     pub fn list_layers(&self) -> Result<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name FROM layers ORDER BY name")?;
+        let mut stmt = self.conn.prepare("SELECT name FROM layers ORDER BY name")?;
         let names: Vec<String> = stmt
             .query_map([], |row| row.get(0))?
             .collect::<std::result::Result<Vec<_>, _>>()?;

@@ -17,7 +17,11 @@ fn overlay_mount_unmount_cycle() {
         let engine = f.engine();
 
         engine
-            .create_layer("test-layer", LayerSource::Directory(lower.clone()), merged.clone())
+            .create_layer(
+                "test-layer",
+                LayerSource::Directory(lower.clone()),
+                merged.clone(),
+            )
             .unwrap();
 
         engine.create_layout("overlay-test").unwrap();
@@ -41,9 +45,7 @@ fn overlay_mount_unmount_cycle() {
         let engine = f.engine();
         engine.unmount("overlay-test").unwrap();
 
-        assert!(!fpj::backend::create_backend()
-            .is_mounted(&merged)
-            .unwrap());
+        assert!(!fpj::backend::create_backend().is_mounted(&merged).unwrap());
     }
 }
 

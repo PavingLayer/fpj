@@ -7,20 +7,26 @@ use crate::error::{LayerfsError, Result};
 
 pub struct LinuxBackend;
 
+impl Default for LinuxBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LinuxBackend {
     pub fn new() -> Self {
         Self
     }
 
-    fn run_fuse_tool(name: &str, args: &[&std::ffi::OsStr]) -> std::result::Result<(), LayerfsError> {
-        let output = Command::new(name)
-            .args(args)
-            .output()
-            .map_err(|e| {
-                LayerfsError::Backend(format!(
-                    "{name} not available (install it with your package manager): {e}"
-                ))
-            })?;
+    fn run_fuse_tool(
+        name: &str,
+        args: &[&std::ffi::OsStr],
+    ) -> std::result::Result<(), LayerfsError> {
+        let output = Command::new(name).args(args).output().map_err(|e| {
+            LayerfsError::Backend(format!(
+                "{name} not available (install it with your package manager): {e}"
+            ))
+        })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -56,18 +62,22 @@ impl MountBackend for LinuxBackend {
             work_dir.display()
         );
 
-        Self::run_fuse_tool("fuse-overlayfs", &[
-            std::ffi::OsStr::new("-o"),
-            std::ffi::OsStr::new(&opts),
-            mount_point.as_os_str(),
-        ])
+        Self::run_fuse_tool(
+            "fuse-overlayfs",
+            &[
+                std::ffi::OsStr::new("-o"),
+                std::ffi::OsStr::new(&opts),
+                mount_point.as_os_str(),
+            ],
+        )
     }
 
     fn unmount_overlay(&self, mount_point: &Path) -> Result<()> {
-        Self::run_fuse_tool("fusermount", &[
-            std::ffi::OsStr::new("-u"),
-            mount_point.as_os_str(),
-        ]).map_err(|e| LayerfsError::UnmountFailed {
+        Self::run_fuse_tool(
+            "fusermount",
+            &[std::ffi::OsStr::new("-u"), mount_point.as_os_str()],
+        )
+        .map_err(|e| LayerfsError::UnmountFailed {
             path: mount_point.to_path_buf(),
             reason: e.to_string(),
         })
@@ -76,10 +86,7 @@ impl MountBackend for LinuxBackend {
     fn bind_mount(&self, source: &Path, target: &Path) -> Result<()> {
         self.ensure_writable_in_overlay(target)?;
 
-        Self::run_fuse_tool("bindfs", &[
-            source.as_os_str(),
-            target.as_os_str(),
-        ])
+        Self::run_fuse_tool("bindfs", &[source.as_os_str(), target.as_os_str()])
     }
 
     fn unbind_mount(&self, target: &Path) -> Result<()> {
@@ -87,10 +94,11 @@ impl MountBackend for LinuxBackend {
             return Ok(());
         }
 
-        Self::run_fuse_tool("fusermount", &[
-            std::ffi::OsStr::new("-u"),
-            target.as_os_str(),
-        ]).map_err(|e| LayerfsError::UnmountFailed {
+        Self::run_fuse_tool(
+            "fusermount",
+            &[std::ffi::OsStr::new("-u"), target.as_os_str()],
+        )
+        .map_err(|e| LayerfsError::UnmountFailed {
             path: target.to_path_buf(),
             reason: e.to_string(),
         })

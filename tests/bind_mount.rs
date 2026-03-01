@@ -37,8 +37,6 @@ fn bind_mount_unmount_cycle() {
     {
         let engine = f.engine();
         engine.unmount("bind-test").unwrap();
-        assert!(!fpj::backend::create_backend()
-            .is_mounted(&target)
-            .unwrap());
+        assert!(!fpj::backend::create_backend().is_mounted(&target).unwrap());
     }
 }

@@ -71,10 +71,7 @@ impl Layer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MountStepDef {
     Layer(String),
-    Bind {
-        source: PathBuf,
-        target: PathBuf,
-    },
+    Bind { source: PathBuf, target: PathBuf },
 }
 
 impl MountStepDef {

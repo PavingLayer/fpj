@@ -89,12 +89,12 @@ pub struct UnmountTransaction<'a> {
 }
 
 impl<'a> UnmountTransaction<'a> {
-    pub fn new(
-        layout: &'a Layout,
-        db: &'a LayoutDatabase,
-        backend: &'a dyn MountBackend,
-    ) -> Self {
-        Self { layout, db, backend }
+    pub fn new(layout: &'a Layout, db: &'a LayoutDatabase, backend: &'a dyn MountBackend) -> Self {
+        Self {
+            layout,
+            db,
+            backend,
+        }
     }
 
     pub fn execute(&self) -> Result<()> {

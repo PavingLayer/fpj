@@ -43,9 +43,7 @@ impl MountBackend for MacOSBackend {
             .arg(opts)
             .arg(mount_point.as_os_str())
             .output()
-            .map_err(|e| {
-                LayerfsError::Backend(format!("fuse-overlayfs not available: {e}"))
-            })?;
+            .map_err(|e| LayerfsError::Backend(format!("fuse-overlayfs not available: {e}")))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

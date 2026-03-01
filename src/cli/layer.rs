@@ -59,7 +59,9 @@ pub enum LayerCommand {
 fn parse_source(s: &str) -> Result<LayerSource> {
     if let Some(layer_name) = s.strip_prefix('@') {
         if layer_name.is_empty() {
-            return Err(LayerfsError::Other("layer reference cannot be empty".into()));
+            return Err(LayerfsError::Other(
+                "layer reference cannot be empty".into(),
+            ));
         }
         Ok(LayerSource::Layer(layer_name.to_string()))
     } else {

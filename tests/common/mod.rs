@@ -8,12 +8,14 @@ use fpj::engine::LayoutEngine;
 use tempfile::TempDir;
 
 /// Test fixture that provides a temporary database, directory tree, and engine.
+#[allow(dead_code)]
 pub struct TestFixture {
     pub dir: TempDir,
     pub db_path: PathBuf,
     engine: Option<LayoutEngine>,
 }
 
+#[allow(dead_code)]
 impl TestFixture {
     pub fn new() -> Self {
         let dir = TempDir::new().expect("failed to create temp dir");
@@ -68,6 +70,7 @@ impl TestFixture {
 
 // --- Capability detection ---
 
+#[allow(dead_code)]
 pub fn has_fuse_overlayfs() -> bool {
     Command::new("fuse-overlayfs")
         .arg("--version")
@@ -76,6 +79,7 @@ pub fn has_fuse_overlayfs() -> bool {
         .unwrap_or(false)
 }
 
+#[allow(dead_code)]
 pub fn has_fusermount() -> bool {
     Command::new("fusermount")
         .arg("-V")
@@ -84,10 +88,12 @@ pub fn has_fusermount() -> bool {
         .unwrap_or(false)
 }
 
+#[allow(dead_code)]
 pub fn can_use_fuse() -> bool {
     Path::new("/dev/fuse").exists() && has_fuse_overlayfs() && has_fusermount()
 }
 
+#[allow(dead_code)]
 pub fn can_bind_mount() -> bool {
     #[cfg(target_os = "linux")]
     {

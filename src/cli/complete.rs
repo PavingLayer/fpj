@@ -11,23 +11,27 @@ fn open_db() -> Option<LayoutDatabase> {
 
 pub fn complete_layer_names(current: &OsStr) -> Vec<CompletionCandidate> {
     let Some(db) = open_db() else { return vec![] };
-    let Ok(names) = db.list_layers() else { return vec![] };
+    let Ok(names) = db.list_layers() else {
+        return vec![];
+    };
     let current = current.to_string_lossy();
     names
         .into_iter()
         .filter(|n| n.starts_with(current.as_ref()))
-        .map(|n| CompletionCandidate::new(n))
+        .map(CompletionCandidate::new)
         .collect()
 }
 
 pub fn complete_layout_names(current: &OsStr) -> Vec<CompletionCandidate> {
     let Some(db) = open_db() else { return vec![] };
-    let Ok(names) = db.list_layouts() else { return vec![] };
+    let Ok(names) = db.list_layouts() else {
+        return vec![];
+    };
     let current = current.to_string_lossy();
     names
         .into_iter()
         .filter(|n| n.starts_with(current.as_ref()))
-        .map(|n| CompletionCandidate::new(n))
+        .map(CompletionCandidate::new)
         .collect()
 }
 
@@ -37,7 +41,9 @@ pub fn complete_layer_source(current: &OsStr) -> Vec<CompletionCandidate> {
 
     if let Some(prefix) = current_str.strip_prefix('@') {
         let Some(db) = open_db() else { return vec![] };
-        let Ok(names) = db.list_layers() else { return vec![] };
+        let Ok(names) = db.list_layers() else {
+            return vec![];
+        };
         return names
             .into_iter()
             .filter(|n| n.starts_with(prefix))

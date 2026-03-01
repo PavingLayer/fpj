@@ -24,15 +24,16 @@ fn interleaved_layer_and_binds() {
         let engine = f.engine();
 
         engine
-            .create_layer("ws-layer", LayerSource::Directory(lower.clone()), merged.clone())
+            .create_layer(
+                "ws-layer",
+                LayerSource::Directory(lower.clone()),
+                merged.clone(),
+            )
             .unwrap();
 
         engine.create_layout("mixed-test").unwrap();
         engine
-            .add_step(
-                "mixed-test",
-                MountStepDef::Layer("ws-layer".to_string()),
-            )
+            .add_step("mixed-test", MountStepDef::Layer("ws-layer".to_string()))
             .unwrap();
         engine
             .add_step(

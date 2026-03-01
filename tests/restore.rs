@@ -18,7 +18,11 @@ fn restore_layout_from_database() {
         let engine = f.engine();
 
         engine
-            .create_layer("persist-layer", LayerSource::Directory(lower.clone()), merged.clone())
+            .create_layer(
+                "persist-layer",
+                LayerSource::Directory(lower.clone()),
+                merged.clone(),
+            )
             .unwrap();
 
         engine.create_layout("persist-test").unwrap();
