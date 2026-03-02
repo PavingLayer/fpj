@@ -51,7 +51,8 @@ jobs:
         if: runner.os == 'macOS'
         id: macos-fuse
         run: |
-          brew install --cask macfuse && brew install bindfs
+          brew install --cask macfuse
+          brew install gromgit/fuse/bindfs-mac
           echo "fuse_available=true" >> "$GITHUB_OUTPUT"
         continue-on-error: true
 
