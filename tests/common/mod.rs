@@ -90,7 +90,18 @@ pub fn has_fusermount() -> bool {
 
 #[allow(dead_code)]
 pub fn can_use_fuse() -> bool {
-    Path::new("/dev/fuse").exists() && has_fuse_overlayfs() && has_fusermount()
+    #[cfg(target_os = "linux")]
+    {
+        Path::new("/dev/fuse").exists() && has_fuse_overlayfs() && has_fusermount()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        has_fuse_overlayfs() && can_bind_mount()
+    }
+    #[cfg(target_os = "windows")]
+    {
+        false
+    }
 }
 
 #[allow(dead_code)]
@@ -105,11 +116,45 @@ pub fn can_bind_mount() -> bool {
     }
     #[cfg(target_os = "macos")]
     {
-        Command::new("bindfs")
+        // Check that bindfs exists AND that macFUSE is functional (kernel
+        // extension loaded).  A bare --version check is not enough because
+        // macFUSE requires a reboot after install before the kext is active.
+        let has_binary = Command::new("bindfs")
             .arg("--version")
             .output()
             .map(|o| o.status.success())
-            .unwrap_or(false)
+            .unwrap_or(false);
+        if !has_binary {
+            return false;
+        }
+        let tmp = tempfile::TempDir::new().ok();
+        let Some(ref dir) = tmp else { return false };
+        let src = dir.path().join("src");
+        let tgt = dir.path().join("tgt");
+        let _ = std::fs::create_dir_all(&src);
+        let _ = std::fs::create_dir_all(&tgt);
+        let ok = Command::new("bindfs")
+            .arg(&src)
+            .arg(&tgt)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if ok {
+            let _ = Command::new("umount").arg(&tgt).output();
+        }
+        ok
+    }
+}
+
+#[allow(dead_code)]
+pub fn can_use_fuse_on_macos() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        can_bind_mount()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
     }
 }
 
