@@ -491,8 +491,8 @@ impl FileSystemContext for OverlayFs {
         _file_name: Option<&U16CStr>,
         flags: u32,
     ) {
-        const FspCleanupDelete: u32 = 0x01;
-        if flags & FspCleanupDelete == 0 {
+        const FSP_CLEANUP_DELETE: u32 = 0x01;
+        if flags & FSP_CLEANUP_DELETE == 0 {
             return;
         }
         let guard = context.state.lock().unwrap();

@@ -43,7 +43,7 @@ pub mod macos;
 pub mod windows;
 
 #[cfg(target_os = "windows")]
-pub(crate) mod winfsp_overlay;
+pub mod winfsp_overlay;
 
 /// Create the [`MountBackend`] appropriate for the current operating system.
 pub fn create_backend() -> Box<dyn MountBackend> {
