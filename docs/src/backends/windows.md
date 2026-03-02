@@ -22,39 +22,14 @@ Junctions are removed via `rmdir` (which removes the junction link without delet
 
 True overlay filesystems are not natively available on Windows. The default backend uses a **copy-based strategy**: lower directories are recursively copied to the mount point, then the upper directory is copied on top. This is functional but does not provide true copy-on-write semantics.
 
-## Optional: WinFSP backend
+## Future: advanced backends
 
-[WinFSP](https://winfsp.dev/) provides a user-mode filesystem framework. Build with the feature flag:
+True overlay semantics on Windows may be possible through:
 
-```bash
-cargo build --features winfsp-backend
-```
+- **[WinFSP](https://winfsp.dev/)** — user-mode filesystem framework that could present a merged overlay view similar to Linux's overlayfs.
+- **[Windows Projected File System (ProjFS)](https://learn.microsoft.com/en-us/windows/win32/projfs/projected-file-system)** — built into Windows 10+, provides a user-mode API for virtualizing directory contents.
 
-This enables a virtual filesystem that presents a merged overlay view, similar to Linux's overlayfs. WinFSP must be installed on the target system.
-
-## Optional: ProjFS backend
-
-[Windows Projected File System](https://learn.microsoft.com/en-us/windows/win32/projfs/projected-file-system) is built into Windows 10+ and provides a user-mode API for virtualizing directory contents. Enable with:
-
-```bash
-cargo build --features projfs-backend
-```
-
-ProjFS must be enabled:
-
-```powershell
-Enable-WindowsOptionalFeature -Online -FeatureName Client-ProjFS -NoRestart
-```
-
-## Optional: fpjd
-
-[fpjd](https://github.com/ansnapx/fpjd) is a kernel-mode layered filesystem driver for Windows that provides true overlay capabilities. It requires:
-
-- Kernel driver installation
-- Driver signing (for production use)
-- Communication via IOCTLs
-
-This is the most powerful option but also the most complex to deploy. It is suitable for controlled environments where driver installation is acceptable.
+These are not yet implemented. Contributions are welcome.
 
 ## Mount detection
 

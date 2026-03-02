@@ -5,7 +5,14 @@ use std::process::Command;
 use crate::backend::MountBackend;
 use crate::error::{LayerfsError, Result};
 
+/// macOS backend using macFUSE (`fuse-overlayfs`) for overlays and `bindfs` for bind mounts.
 pub struct MacOSBackend;
+
+impl Default for MacOSBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl MacOSBackend {
     pub fn new() -> Self {

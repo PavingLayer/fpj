@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+/// All errors that can occur during fpj operations.
 #[derive(Debug, thiserror::Error)]
 pub enum LayerfsError {
     #[error("layout '{0}' not found")]
@@ -57,4 +58,5 @@ pub enum LayerfsError {
     Other(String),
 }
 
+/// Convenience alias used throughout the crate.
 pub type Result<T> = std::result::Result<T, LayerfsError>;

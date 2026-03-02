@@ -9,6 +9,12 @@ use crate::error::{LayerfsError, Result};
 /// Overlay support is limited to a copy-based strategy.
 pub struct WindowsBackend;
 
+impl Default for WindowsBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WindowsBackend {
     pub fn new() -> Self {
         Self

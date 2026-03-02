@@ -5,6 +5,10 @@ use rusqlite::Connection;
 use crate::error::{LayerfsError, Result};
 use crate::model::{Layer, LayerRole, LayerSource, Layout, MountStepDef};
 
+/// SQLite-backed persistence for layers and layouts.
+///
+/// All mutations are performed through individual SQL statements or
+/// transactions; the schema is auto-migrated on [`open`](Self::open).
 pub struct LayoutDatabase {
     conn: Connection,
 }
@@ -303,5 +307,141 @@ fn deserialize_source(source_type: &str, source_value: &str) -> LayerSource {
     match source_type {
         "layer" => LayerSource::Layer(source_value.to_string()),
         _ => LayerSource::Directory(PathBuf::from(source_value)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_db() -> LayoutDatabase {
+        LayoutDatabase::open_in_memory().unwrap()
+    }
+
+    fn sample_layer(name: &str) -> Layer {
+        Layer {
+            name: name.to_string(),
+            source: LayerSource::Directory(PathBuf::from("/opt/src")),
+            mount_point: PathBuf::from("/mnt/target"),
+            role: LayerRole::Writable,
+            upper_dir: PathBuf::from("/data/upper"),
+            work_dir: PathBuf::from("/data/work"),
+        }
+    }
+
+    #[test]
+    fn layer_round_trip() {
+        let db = test_db();
+        let layer = sample_layer("base");
+        db.create_layer(&layer).unwrap();
+
+        let loaded = db.load_layer("base").unwrap();
+        assert_eq!(loaded.name, "base");
+        assert_eq!(loaded.mount_point, PathBuf::from("/mnt/target"));
+        assert_eq!(loaded.role, LayerRole::Writable);
+    }
+
+    #[test]
+    fn layer_duplicate_rejected() {
+        let db = test_db();
+        let layer = sample_layer("dup");
+        db.create_layer(&layer).unwrap();
+        assert!(matches!(
+            db.create_layer(&layer),
+            Err(LayerfsError::LayerAlreadyExists(_))
+        ));
+    }
+
+    #[test]
+    fn layer_not_found() {
+        let db = test_db();
+        assert!(matches!(
+            db.load_layer("nope"),
+            Err(LayerfsError::LayerNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn layer_save_updates_role() {
+        let db = test_db();
+        let mut layer = sample_layer("x");
+        db.create_layer(&layer).unwrap();
+
+        layer.role = LayerRole::Locked;
+        db.save_layer(&layer).unwrap();
+
+        let loaded = db.load_layer("x").unwrap();
+        assert_eq!(loaded.role, LayerRole::Locked);
+    }
+
+    #[test]
+    fn layout_round_trip_with_steps() {
+        let db = test_db();
+        db.create_layout("env").unwrap();
+
+        let layout = Layout {
+            name: "env".into(),
+            steps: vec![
+                MountStepDef::Layer("base".into()),
+                MountStepDef::Bind {
+                    source: PathBuf::from("/a"),
+                    target: PathBuf::from("/b"),
+                },
+            ],
+        };
+        db.save_layout(&layout).unwrap();
+
+        let loaded = db.load_layout("env").unwrap();
+        assert_eq!(loaded.steps.len(), 2);
+        assert!(matches!(&loaded.steps[0], MountStepDef::Layer(n) if n == "base"));
+        assert!(matches!(&loaded.steps[1], MountStepDef::Bind { .. }));
+    }
+
+    #[test]
+    fn layout_duplicate_rejected() {
+        let db = test_db();
+        db.create_layout("dup").unwrap();
+        assert!(matches!(
+            db.create_layout("dup"),
+            Err(LayerfsError::LayoutAlreadyExists(_))
+        ));
+    }
+
+    #[test]
+    fn remove_nonexistent_layout() {
+        let db = test_db();
+        assert!(matches!(
+            db.remove_layout("nope"),
+            Err(LayerfsError::LayoutNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn list_layers_sorted() {
+        let db = test_db();
+        db.create_layer(&sample_layer("beta")).unwrap();
+        db.create_layer(&sample_layer("alpha")).unwrap();
+        let names = db.list_layers().unwrap();
+        assert_eq!(names, vec!["alpha", "beta"]);
+    }
+
+    #[test]
+    fn layer_children_finds_references() {
+        let db = test_db();
+        let base = sample_layer("base");
+        db.create_layer(&base).unwrap();
+
+        let child = Layer {
+            name: "child".into(),
+            source: LayerSource::Layer("base".into()),
+            mount_point: PathBuf::from("/mnt/child"),
+            role: LayerRole::Writable,
+            upper_dir: PathBuf::from("/data/child/upper"),
+            work_dir: PathBuf::from("/data/child/work"),
+        };
+        db.create_layer(&child).unwrap();
+
+        let children = db.layer_children("base").unwrap();
+        assert_eq!(children, vec!["child"]);
     }
 }

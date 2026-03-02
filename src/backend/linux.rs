@@ -5,6 +5,7 @@ use std::process::Command;
 use crate::backend::MountBackend;
 use crate::error::{LayerfsError, Result};
 
+/// Linux backend using `fuse-overlayfs` for overlays and `bindfs` for bind mounts.
 pub struct LinuxBackend;
 
 impl Default for LinuxBackend {

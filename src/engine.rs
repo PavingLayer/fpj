@@ -7,6 +7,8 @@ use crate::error::{LayerfsError, Result};
 use crate::model::{Layer, LayerRole, LayerSource, Layout, MountStepDef};
 use crate::operations::{MountTransaction, UnmountTransaction};
 
+/// Central coordinator that ties together the database, mount backend, and
+/// domain logic for layers and layouts.
 pub struct LayoutEngine {
     db: LayoutDatabase,
     backend: Box<dyn MountBackend>,
@@ -249,6 +251,7 @@ impl LayoutEngine {
     }
 }
 
+/// Default path for the fpj SQLite database under the OS data directory.
 pub fn default_db_path() -> PathBuf {
     dirs::data_dir()
         .unwrap_or_else(|| Path::new("/tmp").to_path_buf())
@@ -264,12 +267,14 @@ pub fn layers_data_dir() -> PathBuf {
         .join("layers")
 }
 
+/// Per-layout mount status returned by [`LayoutEngine::status`].
 #[derive(Debug, serde::Serialize)]
 pub struct LayoutStatus {
     pub name: String,
     pub steps: Vec<StepStatus>,
 }
 
+/// Mount status of an individual step within a layout.
 #[derive(Debug, serde::Serialize)]
 pub struct StepStatus {
     pub position: usize,

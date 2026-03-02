@@ -4,6 +4,10 @@ use crate::engine::LayoutEngine;
 use crate::error::{LayerfsError, Result};
 use crate::model::{Layout, MountStepDef};
 
+/// Executes all mount steps in a layout, rolling back on failure.
+///
+/// Steps are executed in order; if any step fails the already-completed
+/// steps are undone in reverse to leave the system in a clean state.
 pub struct MountTransaction<'a> {
     layout: &'a Layout,
     db: &'a LayoutDatabase,
@@ -82,6 +86,7 @@ impl<'a> MountTransaction<'a> {
     }
 }
 
+/// Tears down all mount steps in a layout in reverse order.
 pub struct UnmountTransaction<'a> {
     layout: &'a Layout,
     db: &'a LayoutDatabase,

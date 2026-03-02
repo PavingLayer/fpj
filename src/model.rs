@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{LayerfsError, Result};
 
+/// Whether a layer is writable (accepting changes) or locked (read-only base).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LayerRole {
     Writable,
@@ -19,6 +20,8 @@ impl std::fmt::Display for LayerRole {
     }
 }
 
+/// Where a layer's lower directory comes from: either an on-disk path or
+/// another (locked) layer referenced by name.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LayerSource {
     Directory(PathBuf),
@@ -34,6 +37,8 @@ impl std::fmt::Display for LayerSource {
     }
 }
 
+/// A named overlay layer with its source, mount point, role, and internal
+/// upper/work directories.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Layer {
     pub name: String,
@@ -68,6 +73,8 @@ impl Layer {
     }
 }
 
+/// A single step in a layout's mount sequence: either an overlay layer
+/// reference or a bind mount with explicit source/target paths.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MountStepDef {
     Layer(String),
@@ -100,6 +107,7 @@ impl MountStepDef {
     }
 }
 
+/// An ordered list of mount steps that together form a complete filesystem view.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Layout {
     pub name: String,
@@ -125,5 +133,133 @@ impl Layout {
             return Err(LayerfsError::StepNotFound(position, self.name.clone()));
         }
         Ok(self.steps.remove(position))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_layer(source: LayerSource, mount_point: &str) -> Layer {
+        Layer {
+            name: "test".into(),
+            source,
+            mount_point: PathBuf::from(mount_point),
+            role: LayerRole::Writable,
+            upper_dir: PathBuf::from("/tmp/upper"),
+            work_dir: PathBuf::from("/tmp/work"),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_absolute_paths() {
+        let layer = make_layer(
+            LayerSource::Directory(PathBuf::from("/opt/src")),
+            "/mnt/target",
+        );
+        assert!(layer.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_relative_mount_point() {
+        let layer = make_layer(
+            LayerSource::Directory(PathBuf::from("/opt/src")),
+            "relative/path",
+        );
+        assert!(matches!(
+            layer.validate(),
+            Err(LayerfsError::RelativePath(_))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_relative_source_dir() {
+        let layer = make_layer(
+            LayerSource::Directory(PathBuf::from("relative/src")),
+            "/mnt/target",
+        );
+        assert!(matches!(
+            layer.validate(),
+            Err(LayerfsError::RelativePath(_))
+        ));
+    }
+
+    #[test]
+    fn validate_skips_source_check_for_layer_ref() {
+        let layer = make_layer(LayerSource::Layer("base".into()), "/mnt/target");
+        assert!(layer.validate().is_ok());
+    }
+
+    #[test]
+    fn step_validate_accepts_absolute_bind() {
+        let step = MountStepDef::Bind {
+            source: PathBuf::from("/src"),
+            target: PathBuf::from("/dst"),
+        };
+        assert!(step.validate_paths().is_ok());
+    }
+
+    #[test]
+    fn step_validate_rejects_relative_bind_source() {
+        let step = MountStepDef::Bind {
+            source: PathBuf::from("relative"),
+            target: PathBuf::from("/dst"),
+        };
+        assert!(matches!(
+            step.validate_paths(),
+            Err(LayerfsError::RelativePath(_))
+        ));
+    }
+
+    #[test]
+    fn step_validate_rejects_relative_bind_target() {
+        let step = MountStepDef::Bind {
+            source: PathBuf::from("/src"),
+            target: PathBuf::from("relative"),
+        };
+        assert!(matches!(
+            step.validate_paths(),
+            Err(LayerfsError::RelativePath(_))
+        ));
+    }
+
+    #[test]
+    fn step_validate_always_accepts_layer_ref() {
+        let step = MountStepDef::Layer("anything".into());
+        assert!(step.validate_paths().is_ok());
+    }
+
+    #[test]
+    fn layout_add_step_validates() {
+        let mut layout = Layout::new("test".into());
+        let bad_step = MountStepDef::Bind {
+            source: PathBuf::from("rel"),
+            target: PathBuf::from("/abs"),
+        };
+        assert!(layout.add_step(bad_step).is_err());
+        assert!(layout.steps.is_empty());
+    }
+
+    #[test]
+    fn layout_remove_step_out_of_bounds() {
+        let mut layout = Layout::new("test".into());
+        assert!(matches!(
+            layout.remove_step(0),
+            Err(LayerfsError::StepNotFound(0, _))
+        ));
+    }
+
+    #[test]
+    fn layout_remove_step_returns_removed() {
+        let mut layout = Layout::new("test".into());
+        layout
+            .add_step(MountStepDef::Layer("a".into()))
+            .unwrap();
+        layout
+            .add_step(MountStepDef::Layer("b".into()))
+            .unwrap();
+        let removed = layout.remove_step(0).unwrap();
+        assert!(matches!(removed, MountStepDef::Layer(name) if name == "a"));
+        assert_eq!(layout.steps.len(), 1);
     }
 }
