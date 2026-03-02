@@ -79,7 +79,15 @@ impl MountBackend for WindowsBackend {
     ) -> Result<()> {
         fs::create_dir_all(upper_dir)?;
         fs::create_dir_all(work_dir)?;
-        fs::create_dir_all(mount_point)?;
+
+        // WinFSP creates the mount point itself (as a reparse point).
+        // Ensure the parent exists, but the mount point must not.
+        if let Some(parent) = mount_point.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        if mount_point.exists() {
+            let _ = fs::remove_dir(mount_point);
+        }
 
         let exe = Self::find_fpj_exe().map_err(|e| {
             LayerfsError::Backend(format!("cannot locate fpj executable: {e}"))
