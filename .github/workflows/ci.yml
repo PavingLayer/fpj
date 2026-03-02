@@ -44,7 +44,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y fuse-overlayfs fuse3
+          sudo apt-get install -y fuse-overlayfs fuse3 bindfs
           sudo modprobe fuse
 
       - name: Install macFUSE and bindfs

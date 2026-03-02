@@ -6,6 +6,14 @@ use fpj::model::{LayerRole, LayerSource};
 
 use common::TestFixture;
 
+fn abs(p: &str) -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from(format!("C:\\{p}"))
+    } else {
+        PathBuf::from(format!("/{p}"))
+    }
+}
+
 #[test]
 fn lock_and_unlock_layer_via_engine() {
     let mut f = TestFixture::new();
@@ -16,17 +24,15 @@ fn lock_and_unlock_layer_via_engine() {
         engine
             .create_layer(
                 "lock-test",
-                LayerSource::Directory(PathBuf::from("/tmp/lower")),
-                PathBuf::from("/tmp/mp"),
+                LayerSource::Directory(abs("tmp/lower")),
+                abs("tmp/mp"),
             )
             .unwrap();
 
-        // Lock: writable -> locked
         engine.lock_layer("lock-test").unwrap();
         let layer = engine.get_layer("lock-test").unwrap();
         assert_eq!(layer.role, LayerRole::Locked);
 
-        // Unlock: locked -> writable
         engine.unlock_layer("lock-test").unwrap();
         let layer = engine.get_layer("lock-test").unwrap();
         assert_eq!(layer.role, LayerRole::Writable);
@@ -43,8 +49,8 @@ fn lock_already_locked_fails() {
         engine
             .create_layer(
                 "double-lock",
-                LayerSource::Directory(PathBuf::from("/tmp/lower")),
-                PathBuf::from("/tmp/mp"),
+                LayerSource::Directory(abs("tmp/lower")),
+                abs("tmp/mp"),
             )
             .unwrap();
 
@@ -64,8 +70,8 @@ fn unlock_already_writable_fails() {
         engine
             .create_layer(
                 "unlock-wr",
-                LayerSource::Directory(PathBuf::from("/tmp/lower")),
-                PathBuf::from("/tmp/mp"),
+                LayerSource::Directory(abs("tmp/lower")),
+                abs("tmp/mp"),
             )
             .unwrap();
 
@@ -84,16 +90,15 @@ fn create_layer_referencing_unlocked_base_fails() {
         engine
             .create_layer(
                 "base-layer",
-                LayerSource::Directory(PathBuf::from("/tmp/lower")),
-                PathBuf::from("/tmp/mp1"),
+                LayerSource::Directory(abs("tmp/lower")),
+                abs("tmp/mp1"),
             )
             .unwrap();
 
-        // Try to create child layer referencing unlocked base -- should fail
         let result = engine.create_layer(
             "child-layer",
             LayerSource::Layer("base-layer".to_string()),
-            PathBuf::from("/tmp/mp2"),
+            abs("tmp/mp2"),
         );
         assert!(result.is_err());
     }
@@ -109,8 +114,8 @@ fn create_layer_referencing_locked_base_succeeds() {
         engine
             .create_layer(
                 "base-layer",
-                LayerSource::Directory(PathBuf::from("/tmp/lower")),
-                PathBuf::from("/tmp/mp1"),
+                LayerSource::Directory(abs("tmp/lower")),
+                abs("tmp/mp1"),
             )
             .unwrap();
 
@@ -120,7 +125,7 @@ fn create_layer_referencing_locked_base_succeeds() {
             .create_layer(
                 "child-layer",
                 LayerSource::Layer("base-layer".to_string()),
-                PathBuf::from("/tmp/mp2"),
+                abs("tmp/mp2"),
             )
             .unwrap();
 
@@ -139,8 +144,8 @@ fn chain_resolution_produces_correct_lower_dirs() {
         engine
             .create_layer(
                 "grandparent",
-                LayerSource::Directory(PathBuf::from("/data/base")),
-                PathBuf::from("/tmp/mp-gp"),
+                LayerSource::Directory(abs("data/base")),
+                abs("tmp/mp-gp"),
             )
             .unwrap();
 
@@ -150,7 +155,7 @@ fn chain_resolution_produces_correct_lower_dirs() {
             .create_layer(
                 "parent",
                 LayerSource::Layer("grandparent".to_string()),
-                PathBuf::from("/tmp/mp-p"),
+                abs("tmp/mp-p"),
             )
             .unwrap();
 
@@ -160,13 +165,12 @@ fn chain_resolution_produces_correct_lower_dirs() {
             .create_layer(
                 "child",
                 LayerSource::Layer("parent".to_string()),
-                PathBuf::from("/tmp/mp-c"),
+                abs("tmp/mp-c"),
             )
             .unwrap();
 
         let lower_dirs = engine.resolve_lower_dirs("child").unwrap();
 
-        // Should be: [parent.upper_dir, grandparent.upper_dir, /data/base]
         assert_eq!(lower_dirs.len(), 3);
 
         let parent = engine.get_layer("parent").unwrap();
@@ -174,7 +178,7 @@ fn chain_resolution_produces_correct_lower_dirs() {
 
         assert_eq!(lower_dirs[0], parent.upper_dir);
         assert_eq!(lower_dirs[1], grandparent.upper_dir);
-        assert_eq!(lower_dirs[2], PathBuf::from("/data/base"));
+        assert_eq!(lower_dirs[2], abs("data/base"));
     }
 }
 
@@ -188,8 +192,8 @@ fn siblings_sharing_same_base_resolve_independently() {
         engine
             .create_layer(
                 "shared-base",
-                LayerSource::Directory(PathBuf::from("/data/base")),
-                PathBuf::from("/tmp/mp-base"),
+                LayerSource::Directory(abs("data/base")),
+                abs("tmp/mp-base"),
             )
             .unwrap();
 
@@ -199,7 +203,7 @@ fn siblings_sharing_same_base_resolve_independently() {
             .create_layer(
                 "sibling-a",
                 LayerSource::Layer("shared-base".to_string()),
-                PathBuf::from("/tmp/mp-a"),
+                abs("tmp/mp-a"),
             )
             .unwrap();
 
@@ -207,7 +211,7 @@ fn siblings_sharing_same_base_resolve_independently() {
             .create_layer(
                 "sibling-b",
                 LayerSource::Layer("shared-base".to_string()),
-                PathBuf::from("/tmp/mp-b"),
+                abs("tmp/mp-b"),
             )
             .unwrap();
 
@@ -216,16 +220,14 @@ fn siblings_sharing_same_base_resolve_independently() {
 
         let shared_base = engine.get_layer("shared-base").unwrap();
 
-        // Both resolve to the same chain: [shared-base/upper, /data/base]
         assert_eq!(dirs_a.len(), 2);
         assert_eq!(dirs_b.len(), 2);
         assert_eq!(dirs_a[0], shared_base.upper_dir);
         assert_eq!(dirs_b[0], shared_base.upper_dir);
-        assert_eq!(dirs_a[1], PathBuf::from("/data/base"));
-        assert_eq!(dirs_b[1], PathBuf::from("/data/base"));
+        assert_eq!(dirs_a[1], abs("data/base"));
+        assert_eq!(dirs_b[1], abs("data/base"));
         assert_eq!(dirs_a, dirs_b);
 
-        // But each sibling has its own upper dir
         let a = engine.get_layer("sibling-a").unwrap();
         let b = engine.get_layer("sibling-b").unwrap();
         assert_ne!(a.upper_dir, b.upper_dir);
@@ -242,8 +244,8 @@ fn chain_resolution_fails_on_unlocked_base() {
         engine
             .create_layer(
                 "base",
-                LayerSource::Directory(PathBuf::from("/data/base")),
-                PathBuf::from("/tmp/mp1"),
+                LayerSource::Directory(abs("data/base")),
+                abs("tmp/mp1"),
             )
             .unwrap();
 
@@ -253,26 +255,22 @@ fn chain_resolution_fails_on_unlocked_base() {
             .create_layer(
                 "middle",
                 LayerSource::Layer("base".to_string()),
-                PathBuf::from("/tmp/mp2"),
+                abs("tmp/mp2"),
             )
             .unwrap();
 
-        // middle is writable -- resolving should fail
         let result = engine.resolve_lower_dirs("middle");
-        // This should succeed since "base" (the referenced layer) is locked
         assert!(result.is_ok());
 
-        // But if we create a child referencing middle (which is writable), resolution fails
         engine.lock_layer("middle").unwrap();
         engine
             .create_layer(
                 "child",
                 LayerSource::Layer("middle".to_string()),
-                PathBuf::from("/tmp/mp3"),
+                abs("tmp/mp3"),
             )
             .unwrap();
 
-        // Now unlock middle to make the chain invalid at resolution time
         engine.unlock_layer("middle").unwrap();
 
         let result = engine.resolve_lower_dirs("child");
