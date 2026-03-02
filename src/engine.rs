@@ -52,6 +52,9 @@ impl LayoutEngine {
             }
         }
 
+        std::fs::create_dir_all(&layer.upper_dir)?;
+        std::fs::create_dir_all(&layer.work_dir)?;
+
         self.db.create_layer(&layer)?;
         Ok(layer)
     }
