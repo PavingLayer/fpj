@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use widestring::U16CStr;
+use windows::Win32::Storage::FileSystem::{FILE_ACCESS_RIGHTS, FILE_FLAGS_AND_ATTRIBUTES};
 use winfsp::filesystem::*;
 use winfsp::host::VolumeParams;
 use winfsp::FspError;
@@ -578,7 +579,7 @@ impl FileSystemContext for OverlayFs {
         if let Ok(lock) = dir_buf.acquire(marker.is_none(), None) {
             // "." entry
             if let Ok(md) = fs::metadata(&guard.0) {
-                let mut di = DirInfo::new();
+                let mut di: DirInfo<255> = DirInfo::new();
                 Self::fill_info(&md, di.file_info_mut());
                 let _ = di.set_name(".");
                 let _ = lock.write(&mut di);
@@ -587,7 +588,7 @@ impl FileSystemContext for OverlayFs {
             // ".." entry
             if let Some(parent) = guard.0.parent() {
                 if let Ok(md) = fs::metadata(parent) {
-                    let mut di = DirInfo::new();
+                    let mut di: DirInfo<255> = DirInfo::new();
                     Self::fill_info(&md, di.file_info_mut());
                     let _ = di.set_name("..");
                     let _ = lock.write(&mut di);
@@ -596,13 +597,12 @@ impl FileSystemContext for OverlayFs {
 
             for (name, path) in self.merged_entries(&context.rel) {
                 if let Ok(md) = fs::metadata(&path) {
-                    let mut di = DirInfo::new();
+                    let mut di: DirInfo<255> = DirInfo::new();
                     Self::fill_info(&md, di.file_info_mut());
                     let _ = di.set_name(&name);
                     let _ = lock.write(&mut di);
                 }
             }
-            // lock dropped here, finalizing the buffer
         }
 
         Ok(dir_buf.read(marker, buffer))
