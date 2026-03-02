@@ -14,7 +14,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use widestring::U16CStr;
-use windows::Win32::Storage::FileSystem::{FILE_ACCESS_RIGHTS, FILE_FLAGS_AND_ATTRIBUTES};
 use winfsp::filesystem::*;
 use winfsp::host::VolumeParams;
 use winfsp::FspError;
@@ -282,7 +281,7 @@ impl FileSystemContext for OverlayFs {
         &self,
         file_name: &U16CStr,
         _create_options: u32,
-        _granted_access: FILE_ACCESS_RIGHTS,
+        _granted_access: u32,
         file_info: &mut OpenFileInfo,
     ) -> winfsp::Result<Self::FileContext> {
         let rel = Self::to_rel(file_name);
@@ -314,8 +313,8 @@ impl FileSystemContext for OverlayFs {
         &self,
         file_name: &U16CStr,
         create_options: u32,
-        _granted_access: FILE_ACCESS_RIGHTS,
-        _file_attributes: FILE_FLAGS_AND_ATTRIBUTES,
+        _granted_access: u32,
+        _file_attributes: u32,
         _security_descriptor: Option<&[std::ffi::c_void]>,
         _allocation_size: u64,
         _extra_buffer: Option<&[u8]>,
@@ -457,7 +456,7 @@ impl FileSystemContext for OverlayFs {
     fn overwrite(
         &self,
         context: &Self::FileContext,
-        _file_attributes: FILE_FLAGS_AND_ATTRIBUTES,
+        _file_attributes: u32,
         _replace_file_attributes: bool,
         _allocation_size: u64,
         _extra_buffer: Option<&[u8]>,
