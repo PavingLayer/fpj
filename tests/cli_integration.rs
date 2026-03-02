@@ -8,6 +8,10 @@ fn fpj_cmd(db_path: &std::path::Path) -> Command {
     cmd
 }
 
+fn p(tmp: &TempDir, name: &str) -> String {
+    tmp.path().join(name).to_string_lossy().into_owned()
+}
+
 #[test]
 fn layout_create_list_show_remove() {
     let tmp = TempDir::new().unwrap();
@@ -60,9 +64,9 @@ fn layer_create_list_show_remove() {
             "create",
             "base-img",
             "--source",
-            "/tmp/base",
+            &p(&tmp, "base"),
             "--mount-point",
-            "/tmp/merged",
+            &p(&tmp, "merged"),
         ])
         .assert()
         .success()
@@ -74,9 +78,9 @@ fn layer_create_list_show_remove() {
             "create",
             "base-img",
             "--source",
-            "/tmp/base",
+            &p(&tmp, "base"),
             "--mount-point",
-            "/tmp/merged2",
+            &p(&tmp, "merged2"),
         ])
         .assert()
         .failure();
@@ -121,9 +125,9 @@ fn layer_lock_unlock() {
             "create",
             "lk",
             "--source",
-            "/tmp/base",
+            &p(&tmp, "base"),
             "--mount-point",
-            "/tmp/mp",
+            &p(&tmp, "mp"),
         ])
         .assert()
         .success();
@@ -152,16 +156,15 @@ fn step_add_layer_and_bind() {
     let tmp = TempDir::new().unwrap();
     let db = tmp.path().join("test.db");
 
-    // Create a layer first
     fpj_cmd(&db)
         .args([
             "layer",
             "create",
             "ws-layer",
             "--source",
-            "/tmp/base",
+            &p(&tmp, "base"),
             "--mount-point",
-            "/tmp/merged",
+            &p(&tmp, "merged"),
         ])
         .assert()
         .success();
@@ -181,7 +184,13 @@ fn step_add_layer_and_bind() {
     // Add bind step
     fpj_cmd(&db)
         .args([
-            "step", "add-bind", "ws", "--source", "/tmp/src", "--target", "/tmp/tgt",
+            "step",
+            "add-bind",
+            "ws",
+            "--source",
+            &p(&tmp, "src"),
+            "--target",
+            &p(&tmp, "tgt"),
         ])
         .assert()
         .success()
@@ -228,9 +237,9 @@ fn layer_reference_with_at_syntax() {
             "create",
             "base",
             "--source",
-            "/tmp/base-dir",
+            &p(&tmp, "base-dir"),
             "--mount-point",
-            "/tmp/mp1",
+            &p(&tmp, "mp1"),
         ])
         .assert()
         .success();
@@ -249,7 +258,7 @@ fn layer_reference_with_at_syntax() {
             "--source",
             "@base",
             "--mount-point",
-            "/tmp/mp2",
+            &p(&tmp, "mp2"),
         ])
         .assert()
         .success()
@@ -281,7 +290,7 @@ fn reject_relative_paths() {
             "--source",
             "relative/path",
             "--target",
-            "/tmp/tgt",
+            &p(&tmp, "tgt"),
         ])
         .assert()
         .failure();
@@ -295,7 +304,7 @@ fn reject_relative_paths() {
             "--source",
             "relative/lower",
             "--mount-point",
-            "/tmp/merged",
+            &p(&tmp, "merged"),
         ])
         .assert()
         .failure();
@@ -313,7 +322,13 @@ fn status_json_output() {
 
     fpj_cmd(&db)
         .args([
-            "step", "add-bind", "js", "--source", "/tmp/src", "--target", "/tmp/tgt",
+            "step",
+            "add-bind",
+            "js",
+            "--source",
+            &p(&tmp, "src"),
+            "--target",
+            &p(&tmp, "tgt"),
         ])
         .assert()
         .success();
