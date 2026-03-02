@@ -20,13 +20,15 @@ tools/fpj/
 │   │   ├── mod.rs           # MountBackend trait + factory
 │   │   ├── linux.rs         # fuse-overlayfs + nix
 │   │   ├── macos.rs         # macFUSE + bindfs
-│   │   └── windows.rs       # Junctions / WinFSP / ProjFS
+│   │   ├── windows.rs       # WinFSP overlay + NTFS junctions
+│   │   └── winfsp_overlay.rs # WinFSP FileSystemContext overlay FS
 │   └── cli/
 │       ├── mod.rs           # Clap subcommand dispatch
 │       ├── layer.rs         # layer commands
 │       ├── layout.rs        # layout commands
 │       ├── step.rs          # step commands
-│       └── mount.rs         # (reserved)
+│       ├── doctor.rs        # fpj doctor diagnostics
+│       └── overlay_serve.rs # WinFSP overlay daemon (Windows)
 └── tests/
     ├── common/mod.rs        # Test helpers + capability detection
     ├── layout_persistence.rs
@@ -153,5 +155,5 @@ Key test categories:
 
 See `.github/workflows/fpj.yml` for the CI matrix:
 - Linux: full coverage (all tests, with sudo + FUSE)
-- macOS: conditional (depends on macFUSE installation success)
-- Windows: partial (junction-based tests + database tests)
+- macOS: full coverage (requires macFUSE)
+- Windows: full coverage (requires WinFSP)

@@ -21,7 +21,7 @@ Release binaries are built by CI for:
 | Linux aarch64 | `aarch64-unknown-linux-musl` | Statically linked |
 | macOS Apple Silicon | `aarch64-apple-darwin` | Requires macFUSE for overlay support |
 | macOS Intel | `x86_64-apple-darwin` | Requires macFUSE for overlay support |
-| Windows x86_64 | `x86_64-pc-windows-msvc` | Junction-based backend by default |
+| Windows x86_64 | `x86_64-pc-windows-msvc` | Requires WinFSP for overlay support |
 
 Download from the GitHub Releases page and place on your `PATH`.
 
@@ -54,13 +54,15 @@ On macOS 15.4+, the FSKit backend runs entirely in user space -- no kernel exten
 
 ### Windows
 
-The default Windows backend uses NTFS junction points, which require no additional software.
+Install [WinFSP](https://winfsp.dev/) (required for overlay filesystem support):
 
-For advanced overlay support, optionally install [WinFSP](https://winfsp.dev/) and build with:
-
-```bash
-cargo install --path . --features winfsp-backend
+```powershell
+choco install winfsp
 ```
+
+Or download the installer from [winfsp.dev/rel](https://winfsp.dev/rel/).
+
+NTFS junction points for bind mounts work out of the box on all NTFS volumes.
 
 ## Data directories
 

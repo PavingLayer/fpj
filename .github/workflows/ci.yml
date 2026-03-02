@@ -49,12 +49,13 @@ jobs:
 
       - name: Install macFUSE and bindfs
         if: runner.os == 'macOS'
-        id: macos-fuse
         run: |
           brew install --cask macfuse
           brew install gromgit/fuse/bindfs-mac
-          echo "fuse_available=true" >> "$GITHUB_OUTPUT"
-        continue-on-error: true
+
+      - name: Install WinFSP
+        if: runner.os == 'Windows'
+        run: choco install winfsp -y
 
       - name: Build
         run: cargo build --release
@@ -63,15 +64,9 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo env "PATH=$PATH" RUSTUP_TOOLCHAIN=stable cargo test --release
 
-      - name: Run tests (macOS, FUSE available)
-        if: runner.os == 'macOS' && steps.macos-fuse.outputs.fuse_available == 'true'
+      - name: Run tests (macOS)
+        if: runner.os == 'macOS'
         run: cargo test --release
-
-      - name: Run tests (macOS, no FUSE)
-        if: runner.os == 'macOS' && steps.macos-fuse.outputs.fuse_available != 'true'
-        run: |
-          echo "::warning::macFUSE/bindfs not available — running non-mount tests only"
-          cargo test --release --lib
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'

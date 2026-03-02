@@ -5,8 +5,8 @@ use crate::error::Result;
 /// Platform-specific mount operations.
 ///
 /// Each supported OS provides its own implementation: Linux uses
-/// `fuse-overlayfs`/`bindfs`, macOS uses macFUSE, and Windows uses NTFS
-/// junction points with a copy-based overlay fallback.
+/// `fuse-overlayfs`/`bindfs`, macOS uses macFUSE, and Windows uses
+/// WinFSP for overlays with NTFS junction points for bind mounts.
 pub trait MountBackend {
     /// Create an overlay filesystem merging `lower_dirs` with `upper_dir` at `mount_point`.
     fn mount_overlay(
@@ -41,6 +41,9 @@ pub mod macos;
 
 #[cfg(target_os = "windows")]
 pub mod windows;
+
+#[cfg(target_os = "windows")]
+pub(crate) mod winfsp_overlay;
 
 /// Create the [`MountBackend`] appropriate for the current operating system.
 pub fn create_backend() -> Box<dyn MountBackend> {

@@ -1,6 +1,9 @@
 mod complete;
+mod doctor;
 mod layer;
 mod layout;
+#[cfg(target_os = "windows")]
+mod overlay_serve;
 mod step;
 
 use std::path::PathBuf;
@@ -72,12 +75,46 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Check system dependencies and run smoke tests
+    Doctor {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// (internal) Host a WinFSP overlay filesystem daemon
+    #[command(hide = true)]
+    OverlayServe {
+        #[arg(long)]
+        lower: Vec<PathBuf>,
+        #[arg(long)]
+        upper: PathBuf,
+        #[arg(long)]
+        work: PathBuf,
+        #[arg(long)]
+        mount_point: PathBuf,
+    },
 }
 
 pub fn run() -> Result<()> {
     CompleteEnv::with_factory(Cli::command).complete();
 
     let cli = Cli::parse();
+
+    if let Commands::Doctor { json } = cli.command {
+        return doctor::handle(json);
+    }
+
+    #[cfg(target_os = "windows")]
+    if let Commands::OverlayServe {
+        lower,
+        upper,
+        work,
+        mount_point,
+    } = cli.command
+    {
+        return overlay_serve::handle(lower, upper, work, mount_point);
+    }
+
     let db_path = cli.db.unwrap_or_else(default_db_path);
     let db = LayoutDatabase::open(&db_path)?;
     let backend = create_backend();
@@ -117,6 +154,9 @@ pub fn run() -> Result<()> {
                 }
             }
             Ok(())
+        }
+        Commands::Doctor { .. } | Commands::OverlayServe { .. } => {
+            unreachable!("handled above")
         }
     }
 }

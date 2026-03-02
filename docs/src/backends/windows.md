@@ -1,10 +1,38 @@
 # Windows Backend
 
-The Windows backend provides baseline support using NTFS features, with optional advanced backends available behind feature flags.
+The Windows backend uses [WinFSP](https://winfsp.dev/) for true overlay mount
+support and NTFS junction points for bind mounts.
 
-## Default: junction points + copy
+## Requirements
 
-### Bind mounts
+- **WinFSP 2.0+** — user-mode filesystem framework ([download](https://winfsp.dev/rel/) or `choco install winfsp`)
+
+## Overlay mounts
+
+fpj implements a custom overlay filesystem using the WinFSP API. It presents a
+merged view of one or more read-only lower directories and one read-write upper
+directory at the mount point, with full copy-on-write semantics.
+
+The overlay runs as a background daemon process (`fpj overlay-serve`) that is
+automatically spawned by `fpj mount` and terminated by `fpj unmount`. The
+daemon's PID is stored in the layer's work directory.
+
+### Layer resolution
+
+When a file is accessed through the mount point:
+
+1. The upper directory is checked first.
+2. Lower directories are checked in priority order (first listed = highest priority).
+3. If a whiteout marker (`.wh.<filename>`) exists in the upper directory, the
+   file is treated as deleted even if it exists in a lower directory.
+
+### Copy-on-write
+
+When a file from a lower directory is modified, it is first copied to the upper
+directory. Subsequent operations work on the upper copy, leaving the lower layer
+untouched.
+
+## Bind mounts
 
 Windows bind mounts use **NTFS junction points** (`mklink /J`), which:
 
@@ -16,27 +44,21 @@ Windows bind mounts use **NTFS junction points** (`mklink /J`), which:
 mklink /J <target> <source>
 ```
 
-Junctions are removed via `rmdir` (which removes the junction link without deleting the source directory).
-
-### Overlay mounts
-
-True overlay filesystems are not natively available on Windows. The default backend uses a **copy-based strategy**: lower directories are recursively copied to the mount point, then the upper directory is copied on top. This is functional but does not provide true copy-on-write semantics.
-
-## Future: advanced backends
-
-True overlay semantics on Windows may be possible through:
-
-- **[WinFSP](https://winfsp.dev/)** — user-mode filesystem framework that could present a merged overlay view similar to Linux's overlayfs.
-- **[Windows Projected File System (ProjFS)](https://learn.microsoft.com/en-us/windows/win32/projfs/projected-file-system)** — built into Windows 10+, provides a user-mode API for virtualizing directory contents.
-
-These are not yet implemented. Contributions are welcome.
+Junctions are removed via `rmdir` (which removes the junction link without
+deleting the source directory).
 
 ## Mount detection
 
-The Windows backend checks whether a path is a junction/symlink via filesystem metadata. This only applies to the junction-based bind mount approach.
+The backend checks for active junctions via symlink metadata and for overlay
+mounts via the daemon PID file.
+
+## Diagnostics
+
+Run `fpj doctor` to verify that WinFSP is installed and that overlay and bind
+mount operations work correctly on your system.
 
 ## Limitations
 
-- The copy-based overlay does not provide live merge semantics -- changes to lower directories after mount are not reflected
 - Junction points only work within the same NTFS volume
-- No unprivileged overlay mount without WinFSP or ProjFS
+- WinFSP must be installed system-wide (it is a driver framework, not a
+  portable binary)

@@ -15,8 +15,9 @@ database.
 - Bind mount support interleaved with overlay layers
 - Atomic mount/unmount with automatic rollback on failure
 - Persistent layout definitions that survive reboots (`fpj restore`)
-- Cross-platform: Linux (fuse-overlayfs), macOS (macFUSE),
-  Windows (junction points + copy-based overlay)
+- Cross-platform: Linux (`fuse-overlayfs`), macOS (macFUSE),
+  Windows (WinFSP overlay + NTFS junctions)
+- Built-in diagnostics (`fpj doctor`) to verify system dependencies
 
 ## Installation
 

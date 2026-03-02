@@ -100,8 +100,16 @@ pub fn can_use_fuse() -> bool {
     }
     #[cfg(target_os = "windows")]
     {
-        false
+        has_winfsp()
     }
+}
+
+#[allow(dead_code)]
+pub fn has_winfsp() -> bool {
+    std::env::var("PROGRAMFILES(X86)")
+        .or_else(|_| std::env::var("PROGRAMFILES"))
+        .map(|pf| std::path::Path::new(&pf).join("WinFsp").join("bin").exists())
+        .unwrap_or(false)
 }
 
 #[allow(dead_code)]
