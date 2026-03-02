@@ -87,7 +87,15 @@ impl MountBackend for LinuxBackend {
     fn bind_mount(&self, source: &Path, target: &Path) -> Result<()> {
         self.ensure_writable_in_overlay(target)?;
 
-        Self::run_fuse_tool("bindfs", &[source.as_os_str(), target.as_os_str()])
+        Self::run_fuse_tool(
+            "bindfs",
+            &[
+                std::ffi::OsStr::new("-o"),
+                std::ffi::OsStr::new("nonempty"),
+                source.as_os_str(),
+                target.as_os_str(),
+            ],
+        )
     }
 
     fn unbind_mount(&self, target: &Path) -> Result<()> {
