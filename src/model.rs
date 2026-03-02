@@ -140,22 +140,30 @@ impl Layout {
 mod tests {
     use super::*;
 
-    fn make_layer(source: LayerSource, mount_point: &str) -> Layer {
+    fn abs(p: &str) -> PathBuf {
+        if cfg!(windows) {
+            PathBuf::from(format!("C:\\{p}"))
+        } else {
+            PathBuf::from(format!("/{p}"))
+        }
+    }
+
+    fn make_layer(source: LayerSource, mount_point: PathBuf) -> Layer {
         Layer {
             name: "test".into(),
             source,
-            mount_point: PathBuf::from(mount_point),
+            mount_point,
             role: LayerRole::Writable,
-            upper_dir: PathBuf::from("/tmp/upper"),
-            work_dir: PathBuf::from("/tmp/work"),
+            upper_dir: abs("tmp/upper"),
+            work_dir: abs("tmp/work"),
         }
     }
 
     #[test]
     fn validate_accepts_absolute_paths() {
         let layer = make_layer(
-            LayerSource::Directory(PathBuf::from("/opt/src")),
-            "/mnt/target",
+            LayerSource::Directory(abs("opt/src")),
+            abs("mnt/target"),
         );
         assert!(layer.validate().is_ok());
     }
@@ -163,8 +171,8 @@ mod tests {
     #[test]
     fn validate_rejects_relative_mount_point() {
         let layer = make_layer(
-            LayerSource::Directory(PathBuf::from("/opt/src")),
-            "relative/path",
+            LayerSource::Directory(abs("opt/src")),
+            PathBuf::from("relative/path"),
         );
         assert!(matches!(
             layer.validate(),
@@ -176,7 +184,7 @@ mod tests {
     fn validate_rejects_relative_source_dir() {
         let layer = make_layer(
             LayerSource::Directory(PathBuf::from("relative/src")),
-            "/mnt/target",
+            abs("mnt/target"),
         );
         assert!(matches!(
             layer.validate(),
@@ -186,15 +194,15 @@ mod tests {
 
     #[test]
     fn validate_skips_source_check_for_layer_ref() {
-        let layer = make_layer(LayerSource::Layer("base".into()), "/mnt/target");
+        let layer = make_layer(LayerSource::Layer("base".into()), abs("mnt/target"));
         assert!(layer.validate().is_ok());
     }
 
     #[test]
     fn step_validate_accepts_absolute_bind() {
         let step = MountStepDef::Bind {
-            source: PathBuf::from("/src"),
-            target: PathBuf::from("/dst"),
+            source: abs("src"),
+            target: abs("dst"),
         };
         assert!(step.validate_paths().is_ok());
     }
@@ -203,7 +211,7 @@ mod tests {
     fn step_validate_rejects_relative_bind_source() {
         let step = MountStepDef::Bind {
             source: PathBuf::from("relative"),
-            target: PathBuf::from("/dst"),
+            target: abs("dst"),
         };
         assert!(matches!(
             step.validate_paths(),
@@ -214,7 +222,7 @@ mod tests {
     #[test]
     fn step_validate_rejects_relative_bind_target() {
         let step = MountStepDef::Bind {
-            source: PathBuf::from("/src"),
+            source: abs("src"),
             target: PathBuf::from("relative"),
         };
         assert!(matches!(
@@ -234,7 +242,7 @@ mod tests {
         let mut layout = Layout::new("test".into());
         let bad_step = MountStepDef::Bind {
             source: PathBuf::from("rel"),
-            target: PathBuf::from("/abs"),
+            target: abs("abs"),
         };
         assert!(layout.add_step(bad_step).is_err());
         assert!(layout.steps.is_empty());

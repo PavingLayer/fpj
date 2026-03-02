@@ -60,7 +60,7 @@ jobs:
 
       - name: Run tests (Linux)
         if: runner.os == 'Linux'
-        run: sudo cargo test --release
+        run: sudo env "PATH=$PATH" cargo test --release
 
       - name: Run tests (macOS, FUSE available)
         if: runner.os == 'macOS' && steps.macos-fuse.outputs.fuse_available == 'true'
