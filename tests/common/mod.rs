@@ -116,45 +116,18 @@ pub fn can_bind_mount() -> bool {
     }
     #[cfg(target_os = "macos")]
     {
-        // Check that bindfs exists AND that macFUSE is functional (kernel
-        // extension loaded).  A bare --version check is not enough because
-        // macFUSE requires a reboot after install before the kext is active.
-        let has_binary = Command::new("bindfs")
-            .arg("--version")
+        // Check that macFUSE's kernel extension is actually loaded.
+        // After a fresh install macFUSE needs a reboot before the kext
+        // is active; without it any FUSE operation blocks forever, so
+        // we cannot just call `bindfs` and wait.  Instead, check for
+        // the kext via kextstat.
+        Command::new("kextstat")
             .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if !has_binary {
-            return false;
-        }
-        let tmp = tempfile::TempDir::new().ok();
-        let Some(ref dir) = tmp else { return false };
-        let src = dir.path().join("src");
-        let tgt = dir.path().join("tgt");
-        let _ = std::fs::create_dir_all(&src);
-        let _ = std::fs::create_dir_all(&tgt);
-        let ok = Command::new("bindfs")
-            .arg(&src)
-            .arg(&tgt)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if ok {
-            let _ = Command::new("umount").arg(&tgt).output();
-        }
-        ok
-    }
-}
-
-#[allow(dead_code)]
-pub fn can_use_fuse_on_macos() -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        can_bind_mount()
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        true
+            .map(|o| {
+                let stdout = String::from_utf8_lossy(&o.stdout);
+                stdout.contains("macfuse") || stdout.contains("osxfuse")
+            })
+            .unwrap_or(false)
     }
 }
 
