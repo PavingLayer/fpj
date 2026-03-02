@@ -57,7 +57,8 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           choco install winfsp -y
-          echo "$env:ProgramFiles(x86)\WinFsp\bin" | Out-File -Append $env:GITHUB_PATH
+          $winfspBin = [System.Environment]::GetEnvironmentVariable('ProgramFiles(x86)') + '\WinFsp\bin'
+          echo $winfspBin >> $env:GITHUB_PATH
 
       - name: Build
         run: cargo build --release
