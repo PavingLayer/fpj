@@ -28,12 +28,44 @@ impl WindowsBackend {
         work_dir.join("fpj-overlay.pid")
     }
 
+    #[allow(dead_code)]
     fn read_pid(work_dir: &Path) -> Option<u32> {
         fs::read_to_string(Self::pid_path(work_dir))
             .ok()?
             .trim()
             .parse()
             .ok()
+    }
+
+    /// Locate the `fpj` binary. When run from the `fpj` binary itself
+    /// `current_exe()` is correct. During tests the current exe is the test
+    /// binary inside `target/.../deps/`, so we search sibling and parent
+    /// directories for `fpj.exe`.
+    fn find_fpj_exe() -> std::io::Result<PathBuf> {
+        let current = std::env::current_exe()?;
+
+        if let Some(name) = current.file_stem() {
+            if name == "fpj" {
+                return Ok(current);
+            }
+        }
+
+        let dir = current.parent().unwrap_or(Path::new("."));
+        let exe_name = "fpj.exe";
+
+        let candidate = dir.join(exe_name);
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+
+        if let Some(parent) = dir.parent() {
+            let candidate = parent.join(exe_name);
+            if candidate.exists() {
+                return Ok(candidate);
+            }
+        }
+
+        Ok(PathBuf::from(exe_name))
     }
 }
 
@@ -49,7 +81,7 @@ impl MountBackend for WindowsBackend {
         fs::create_dir_all(work_dir)?;
         fs::create_dir_all(mount_point)?;
 
-        let exe = std::env::current_exe().map_err(|e| {
+        let exe = Self::find_fpj_exe().map_err(|e| {
             LayerfsError::Backend(format!("cannot locate fpj executable: {e}"))
         })?;
 
