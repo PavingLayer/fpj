@@ -104,11 +104,17 @@ impl MountBackend for WindowsBackend {
             LayerfsError::Backend(format!("failed to start overlay daemon: {e}"))
         })?;
 
-        // Wait for the daemon to write its PID file (mount is ready).
         let pid_path = Self::pid_path(work_dir);
+        let log_path = work_dir.join("fpj-overlay.log");
         for _ in 0..100 {
             if pid_path.exists() {
                 return Ok(());
+            }
+            if log_path.exists() {
+                let log = fs::read_to_string(&log_path).unwrap_or_default();
+                return Err(LayerfsError::Backend(format!(
+                    "overlay daemon failed: {log}"
+                )));
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
         }

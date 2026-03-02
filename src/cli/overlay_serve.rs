@@ -15,16 +15,26 @@ pub fn handle(
     use fpj::backend::winfsp_overlay::OverlayFs;
     use winfsp::host::FileSystemHost;
 
-    winfsp::winfsp_init_or_die();
+    let log_path = work.join("fpj-overlay.log");
+
+    let init = winfsp::winfsp_init();
+    if let Err(e) = init {
+        let _ = std::fs::write(&log_path, format!("winfsp_init failed: {e:?}\n"));
+        return Err(fpj::error::LayerfsError::Backend(format!(
+            "WinFSP init failed: {e:?}"
+        )));
+    }
 
     let context = OverlayFs::new(lower, upper.clone());
     let params = OverlayFs::volume_params();
 
     let mut host = FileSystemHost::new(params, context).map_err(|e| {
+        let _ = std::fs::write(&log_path, format!("host creation failed: {e}\n"));
         fpj::error::LayerfsError::Backend(format!("WinFSP host creation failed: {e}"))
     })?;
 
     host.mount(&mount_point).map_err(|e| {
+        let _ = std::fs::write(&log_path, format!("mount failed: {e}\n"));
         fpj::error::LayerfsError::Backend(format!(
             "WinFSP mount at {} failed: {e}",
             mount_point.display()
@@ -32,17 +42,14 @@ pub fn handle(
     })?;
 
     host.start().map_err(|e| {
+        let _ = std::fs::write(&log_path, format!("dispatcher start failed: {e}\n"));
         fpj::error::LayerfsError::Backend(format!("WinFSP dispatcher start failed: {e}"))
     })?;
 
-    // Write PID file so the parent process can find and stop us.
     let pid = std::process::id();
     let pid_file = work.join("fpj-overlay.pid");
     let _ = std::fs::write(&pid_file, pid.to_string());
 
-    // Block until the process is terminated.  When the parent calls
-    // TerminateProcess (via unmount_overlay), the WinFSP driver handles
-    // unmounting automatically.
     loop {
         std::thread::park();
     }
