@@ -80,6 +80,10 @@ impl MountBackend for WindowsBackend {
         fs::create_dir_all(upper_dir)?;
         fs::create_dir_all(work_dir)?;
 
+        // Remove stale PID/log files from a previous mount cycle
+        let _ = fs::remove_file(Self::pid_path(work_dir));
+        let _ = fs::remove_file(work_dir.join("fpj-overlay.log"));
+
         // WinFSP creates the mount point itself (as a reparse point).
         // Ensure the parent exists, but the mount point must not.
         if let Some(parent) = mount_point.parent() {
