@@ -6,6 +6,10 @@ use common::TestFixture;
 
 #[test]
 fn interleaved_layer_and_binds() {
+    // NTFS junctions cannot be created inside a WinFSP virtual filesystem,
+    // so bind mounts targeting paths inside an overlay are not supported on
+    // Windows.
+    require!(!cfg!(target_os = "windows"), "bind inside overlay unsupported on Windows");
     require!(common::can_use_fuse(), "FUSE not available");
     require!(common::can_bind_mount(), "bind mount not available");
 
