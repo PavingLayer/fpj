@@ -174,8 +174,20 @@ impl MountBackend for WindowsBackend {
             }
         }
 
-        // Give the daemon a moment to shut down
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        // Give the WinFSP driver time to clean up the mount point
+        for _ in 0..20 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            if !mount_point.exists() {
+                return Ok(());
+            }
+        }
+
+        // Force-remove leftover reparse point / empty directory
+        let _ = Command::new("cmd")
+            .args(["/C", "rmdir"])
+            .arg(mount_point.as_os_str())
+            .output();
+        let _ = fs::remove_dir(mount_point);
 
         Ok(())
     }
@@ -233,19 +245,22 @@ impl MountBackend for WindowsBackend {
     }
 
     fn is_mounted(&self, path: &Path) -> Result<bool> {
-        // Check for junction (bind mount)
-        if path.exists() {
-            if let Ok(md) = fs::symlink_metadata(path) {
-                if md.file_type().is_symlink() {
-                    return Ok(true);
-                }
+        if !path.exists() {
+            return Ok(false);
+        }
+
+        if let Ok(md) = fs::symlink_metadata(path) {
+            // NTFS junction (bind mount) or WinFSP reparse point
+            if md.file_type().is_symlink() {
+                return Ok(true);
+            }
+            // WinFSP mounts may appear as reparse points with directory flag
+            use std::os::windows::fs::FileTypeExt;
+            if md.file_type().is_symlink_dir() {
+                return Ok(true);
             }
         }
-        // Check for WinFSP overlay by looking for the daemon PID
-        // The mount command from WinFSP registers the mount with the OS,
-        // so we can also check via the `mountvol` command or net use.
-        // For simplicity, check if the path is a mountpoint directory
-        // that exists and has the overlay PID file somewhere.
+
         Ok(false)
     }
 
