@@ -12,10 +12,19 @@ use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::engine::ArgValueCompleter;
 use clap_complete::env::CompleteEnv;
 
-use fpj::backend::create_backend;
+use fpj::backend::{create_backend_with, BackendKind};
 use fpj::database::LayoutDatabase;
 use fpj::engine::{default_db_path, LayoutEngine};
 use fpj::error::Result;
+
+fn parse_backend(s: &str) -> std::result::Result<BackendKind, String> {
+    match s {
+        "auto" => Ok(BackendKind::Auto),
+        "fuse" => Ok(BackendKind::Fuse),
+        "kernel" => Ok(BackendKind::Kernel),
+        other => Err(format!("unknown backend '{other}' (expected auto, fuse, or kernel)")),
+    }
+}
 
 #[derive(Parser)]
 #[command(
@@ -26,6 +35,12 @@ struct Cli {
     /// Path to database file (default: ~/.local/share/fpj/fpj.db)
     #[arg(long, global = true)]
     db: Option<PathBuf>,
+
+    /// Mount backend: "auto" (default), "fuse", or "kernel".
+    /// "kernel" uses the mount() syscall (requires root) and produces
+    /// non-FUSE mounts compatible with CRIU checkpoint/restore.
+    #[arg(long, global = true, default_value = "auto", value_parser = parse_backend)]
+    backend: BackendKind,
 
     #[command(subcommand)]
     command: Commands,
@@ -117,7 +132,7 @@ pub fn run() -> Result<()> {
 
     let db_path = cli.db.unwrap_or_else(default_db_path);
     let db = LayoutDatabase::open(&db_path)?;
-    let backend = create_backend();
+    let backend = create_backend_with(cli.backend);
     let engine = LayoutEngine::new(db, backend);
 
     match cli.command {

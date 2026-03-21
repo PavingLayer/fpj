@@ -263,11 +263,29 @@ pub fn default_db_path() -> PathBuf {
 }
 
 /// Base directory for internally managed layer data (upper/work dirs).
+///
+/// When running under `sudo`, the real user's data directory is used
+/// (derived from `SUDO_USER`) so that layers are co-located with the
+/// user's fpj database rather than ending up under `/root/`.
 pub fn layers_data_dir() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| Path::new("/tmp").to_path_buf())
+    real_user_data_dir()
         .join("fpj")
         .join("layers")
+}
+
+fn real_user_data_dir() -> PathBuf {
+    if let Ok(sudo_user) = std::env::var("SUDO_USER") {
+        if nix::unistd::geteuid().is_root() {
+            let home = std::env::var("SUDO_HOME")
+                .or_else(|_| {
+                    // Fall back to /home/<user> (common on Linux)
+                    Ok::<_, std::env::VarError>(format!("/home/{sudo_user}"))
+                })
+                .unwrap();
+            return PathBuf::from(home).join(".local").join("share");
+        }
+    }
+    dirs::data_dir().unwrap_or_else(|| PathBuf::from("/tmp"))
 }
 
 /// Per-layout mount status returned by [`LayoutEngine::status`].

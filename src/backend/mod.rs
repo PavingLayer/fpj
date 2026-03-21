@@ -45,20 +45,56 @@ pub mod windows;
 #[cfg(target_os = "windows")]
 pub mod winfsp_overlay;
 
-/// Create the [`MountBackend`] appropriate for the current operating system.
+/// Selects which mount implementation to use on Linux.
+///
+/// On macOS and Windows this is ignored; the platform default is always used.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BackendKind {
+    /// Use kernel overlayfs + `mount --bind` when running as root,
+    /// otherwise fall back to FUSE.
+    #[default]
+    Auto,
+    /// Force FUSE-based backend (`fuse-overlayfs` + `bindfs`).
+    /// Works without root.
+    Fuse,
+    /// Force kernel-based backend (`mount -t overlay` + `mount --bind`).
+    /// Requires `CAP_SYS_ADMIN`.  Produces non-FUSE mounts compatible
+    /// with CRIU checkpoint/restore.
+    Kernel,
+}
+
+/// Create the default [`MountBackend`] for the current OS (equivalent to
+/// [`create_backend_with`]`(`[`BackendKind::Auto`]`)`.
 pub fn create_backend() -> Box<dyn MountBackend> {
+    create_backend_with(BackendKind::Auto)
+}
+
+/// Create a [`MountBackend`] for the requested [`BackendKind`].
+pub fn create_backend_with(kind: BackendKind) -> Box<dyn MountBackend> {
     #[cfg(target_os = "linux")]
     {
-        Box::new(linux::LinuxBackend::new())
+        match kind {
+            BackendKind::Kernel => Box::new(linux::LinuxKernelBackend::new()),
+            BackendKind::Fuse => Box::new(linux::LinuxBackend::new()),
+            BackendKind::Auto => {
+                if nix::unistd::geteuid().is_root() {
+                    Box::new(linux::LinuxKernelBackend::new())
+                } else {
+                    Box::new(linux::LinuxBackend::new())
+                }
+            }
+        }
     }
 
     #[cfg(target_os = "macos")]
     {
+        let _ = kind;
         Box::new(macos::MacOSBackend::new())
     }
 
     #[cfg(target_os = "windows")]
     {
+        let _ = kind;
         Box::new(windows::WindowsBackend::new())
     }
 }

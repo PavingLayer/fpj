@@ -279,14 +279,52 @@ fn check_bind_deps() -> Vec<Check> {
 }
 
 // ---------------------------------------------------------------------------
+// Linux kernel overlay checks
+// ---------------------------------------------------------------------------
+
+#[cfg(target_os = "linux")]
+fn check_kernel_overlay_deps() -> Vec<Check> {
+    let mut checks = Vec::new();
+
+    if Path::new("/sys/module/overlay").exists() {
+        checks.push(Check::ok("overlay kernel module loaded"));
+    } else {
+        checks.push(Check::fail(
+            "overlay kernel module not loaded",
+            "sudo modprobe overlay",
+        ));
+    }
+
+    if nix::unistd::geteuid().is_root() {
+        checks.push(Check::ok("running as root (CAP_SYS_ADMIN)"));
+    } else {
+        checks.push(Check::fail_with(
+            "not running as root",
+            "kernel overlayfs requires CAP_SYS_ADMIN",
+            "run with sudo: sudo fpj --backend kernel ...",
+        ));
+    }
+
+    checks
+}
+
+#[cfg(not(target_os = "linux"))]
+fn check_kernel_overlay_deps() -> Vec<Check> {
+    vec![Check::fail_with(
+        "kernel overlayfs",
+        "only available on Linux",
+        "",
+    )]
+}
+
+// ---------------------------------------------------------------------------
 // Smoke tests
 // ---------------------------------------------------------------------------
 
-fn run_overlay_smoke_test() -> Check {
-    let backend = fpj::backend::create_backend();
+fn run_smoke_test(backend: &dyn fpj::backend::MountBackend, label: &str) -> Check {
     let tmp = match tempfile::TempDir::new() {
         Ok(t) => t,
-        Err(e) => return Check::fail_with("Overlay smoke test", format!("temp dir: {e}"), ""),
+        Err(e) => return Check::fail_with(label, format!("temp dir: {e}"), ""),
     };
 
     let lower = tmp.path().join("lower");
@@ -300,11 +338,7 @@ fn run_overlay_smoke_test() -> Check {
     let _ = std::fs::write(lower.join("probe.txt"), "fpj-doctor-probe");
 
     if let Err(e) = backend.mount_overlay(&[lower], &upper, &work, &merged) {
-        return Check::fail_with(
-            "Overlay smoke test",
-            format!("mount failed: {e}"),
-            "Check the dependency issues above",
-        );
+        return Check::fail_with(label, format!("mount failed: {e}"), "Check dependency issues above");
     }
 
     let read_ok = std::fs::read_to_string(merged.join("probe.txt"))
@@ -314,21 +348,16 @@ fn run_overlay_smoke_test() -> Check {
     let _ = backend.unmount_overlay(&merged);
 
     if read_ok {
-        Check::ok("Overlay smoke test passed")
+        Check::ok(format!("{label} passed"))
     } else {
-        Check::fail_with(
-            "Overlay smoke test",
-            "mounted but could not read probe file",
-            "Check fuse-overlayfs logs",
-        )
+        Check::fail_with(label, "mounted but could not read probe file", "Check mount logs")
     }
 }
 
-fn run_bind_smoke_test() -> Check {
-    let backend = fpj::backend::create_backend();
+fn run_bind_smoke_test(backend: &dyn fpj::backend::MountBackend, label: &str) -> Check {
     let tmp = match tempfile::TempDir::new() {
         Ok(t) => t,
-        Err(e) => return Check::fail_with("Bind smoke test", format!("temp dir: {e}"), ""),
+        Err(e) => return Check::fail_with(label, format!("temp dir: {e}"), ""),
     };
 
     let source = tmp.path().join("source");
@@ -339,11 +368,7 @@ fn run_bind_smoke_test() -> Check {
     let _ = std::fs::write(source.join("probe.txt"), "fpj-bind-probe");
 
     if let Err(e) = backend.bind_mount(&source, &target) {
-        return Check::fail_with(
-            "Bind smoke test",
-            format!("mount failed: {e}"),
-            "Check the dependency issues above",
-        );
+        return Check::fail_with(label, format!("mount failed: {e}"), "Check dependency issues above");
     }
 
     let read_ok = std::fs::read_to_string(target.join("probe.txt"))
@@ -353,13 +378,9 @@ fn run_bind_smoke_test() -> Check {
     let _ = backend.unbind_mount(&target);
 
     if read_ok {
-        Check::ok("Bind smoke test passed")
+        Check::ok(format!("{label} passed"))
     } else {
-        Check::fail_with(
-            "Bind smoke test",
-            "mounted but could not read probe file",
-            "Check bind mount tool logs",
-        )
+        Check::fail_with(label, "mounted but could not read probe file", "Check mount logs")
     }
 }
 
@@ -370,24 +391,39 @@ pub fn handle(json: bool) -> Result<()> {
     let overlay_deps_ok = overlay_deps.iter().all(|c| c.status == Status::Ok);
     let bind_deps_ok = bind_deps.iter().all(|c| c.status == Status::Ok);
 
+    let fuse_backend = fpj::backend::create_backend_with(fpj::backend::BackendKind::Fuse);
+
     let mut overlay_checks = overlay_deps;
     if overlay_deps_ok {
-        overlay_checks.push(run_overlay_smoke_test());
+        overlay_checks.push(run_smoke_test(fuse_backend.as_ref(), "FUSE overlay smoke test"));
     }
 
     let mut bind_checks = bind_deps;
     if bind_deps_ok {
-        bind_checks.push(run_bind_smoke_test());
+        bind_checks.push(run_bind_smoke_test(fuse_backend.as_ref(), "FUSE bind smoke test"));
+    }
+
+    let kernel_deps = check_kernel_overlay_deps();
+    let kernel_deps_ok = kernel_deps.iter().all(|c| c.status == Status::Ok);
+    let mut kernel_checks = kernel_deps;
+    if kernel_deps_ok {
+        let kernel_backend = fpj::backend::create_backend_with(fpj::backend::BackendKind::Kernel);
+        kernel_checks.push(run_smoke_test(kernel_backend.as_ref(), "Kernel overlay smoke test"));
+        kernel_checks.push(run_bind_smoke_test(kernel_backend.as_ref(), "Kernel bind smoke test"));
     }
 
     let sections = vec![
         Section {
-            title: "Overlay filesystem".into(),
+            title: "FUSE overlay filesystem".into(),
             checks: overlay_checks,
         },
         Section {
-            title: "Bind mounts".into(),
+            title: "FUSE bind mounts".into(),
             checks: bind_checks,
+        },
+        Section {
+            title: "Kernel overlayfs (for CRIU checkpoint/restore)".into(),
+            checks: kernel_checks,
         },
     ];
 
